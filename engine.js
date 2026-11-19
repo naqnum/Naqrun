@@ -168,7 +168,7 @@
   function lignes(min) { return [W5, { k: "course", min: Math.max(10, r5(min - 15)), label: "Course facile" }, { rep: 5, steps: [{ k: "course", min: 0.25, label: "Ligne droite, relâché" }, { k: "course", min: 0.75, label: "Course facile" }] }, C5]; }
   // « Sortie longue avec rappel » (Nolio) : longue facile puis 10 min un cran au-dessus
   function rappel(min) { return [W5, { k: "course", min: Math.max(20, r5(min - 20)), label: "Course facile" }, { k: "cote", min: 10, label: "Rappel, un cran au-dessus" }, C5]; }
-  function strides(min) { return [W5, { k: "course", min: Math.max(10, r5(min - 18)), label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, relâché" }, { k: "course", min: 1, label: "Course facile" }] }, C5]; }
+  function strides(min) { return [W5, { k: "course", min: Math.max(10, r5(min - 18)), label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Petits pas rapides" }, { k: "course", min: 1, label: "Course facile" }] }, C5]; }
   function totalMin(blocks) {
     return blocks.reduce(function (t, b) { return t + (b.rep ? b.rep * b.steps.reduce(function (u, st) { return u + st.min; }, 0) : b.min); }, 0);
   }
@@ -182,8 +182,8 @@
     var out = [
       sess(d(1), "palier", "Footing progression · " + lv.title, lv.blocks, { level: lv.n, phase: PHASES[lv.phase], note: consNote + [lv.note, CADENCE].filter(Boolean).join(" "), key: true, consolidation: cons }),
       lv.phase === 0
-        ? sess(d(3), "cadence", "Footing cadence · 2 × " + Math.max(4, Math.round(lv.block * 0.6 * f)) + " min", [W5, { rep: 2, steps: [{ k: "course", min: Math.max(4, Math.round(lv.block * 0.6 * f)), label: "Course facile" }, { k: "marche", min: 1, label: "Marche" }] }, { rep: 4, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." })
-        : sess(d(3), "cadence", "Footing cadence · " + Math.max(10, cad - 9) + " min", [W5, { k: "course", min: Math.max(10, cad - 9) , label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." }),
+        ? sess(d(3), "cadence", "Footing cadence · 2 × " + Math.max(4, Math.round(lv.block * 0.6 * f)) + " min", [W5, { rep: 2, steps: [{ k: "course", min: Math.max(4, Math.round(lv.block * 0.6 * f)), label: "Course facile" }, { k: "marche", min: 1, label: "Marche" }] }, { rep: 4, steps: [{ k: "course", min: 0.5, label: "Petits pas rapides" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Petits pas rapides = tu gardes exactement le même effort (même respiration, même FC), tu raccourcis juste la foulée pour faire plus de pas par minute, comme si le sol était brûlant. Tu ne vas pas plus vite. Entre deux, tu reviens à ta foulée normale." })
+        : sess(d(3), "cadence", "Footing cadence · " + Math.max(10, cad - 9) + " min", [W5, { k: "course", min: Math.max(10, cad - 9) , label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Petits pas rapides" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Petits pas rapides = tu gardes exactement le même effort (même respiration, même FC), tu raccourcis juste la foulée pour faire plus de pas par minute, comme si le sol était brûlant. Tu ne vas pas plus vite. Entre deux, tu reviens à ta foulée normale." }),
       sess(d(4), "velo", "Vélo / elliptique · facile", bike(clamp(45 + 5 * (lv.n - 10), 40, 90) * f), { note: "Endurance sans impact pour le tibia." }),
       sess(d(5), "rando", "Rando-course · terrain souple", rando(clamp(lv.run * 1.6, 45, 150) * f, Math.min(25, Math.round(lv.run * 0.3), lv.block || 99)), { note: "Terrain souple. Montées raides et descentes en marchant." }),
     ];
@@ -477,7 +477,7 @@
     if (/^Échauffement/.test(l)) lbl = "Échauffement";
     else if (/^Retour/.test(l)) lbl = "Retour au calme";
     else if (/^Descente/.test(l)) lbl = "Descente marchée";
-    else if (/^Cadence/.test(l)) lbl = "Cadence haute";
+    else if (/^Petits pas/.test(l)) lbl = "Petits pas rapides";
     else if (/^Rando/.test(l)) lbl = "Rando";
     else lbl = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : st.k === "velo" ? "Vélo" : "Course";
     return "- " + lbl + " " + dur(st.min) + " " + z;
