@@ -17,7 +17,7 @@
 <style>
 :root{
   --bg:#0E0F11;--surface:#1A1C20;--surface2:#22252A;--text:#F2F2F0;--muted:#A6AAB1;--border:#2B2E34;
-  --accent:#FF7A1A;--accent-text:#140A02;--soft:#2A1D12;--soft-text:#FFB27A;
+  --accent:#FF7A1A;--accent-dim:#8A4A1E;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--accent-text:#140A02;--soft:#2A1D12;--soft-text:#FFB27A;
   --g-bg:#15301F;--g:#7FD8A0;--y-bg:#33300F;--y:#F2D46B;--o-bg:#3A2410;--o:#FFB066;--r-bg:#3A1614;--r:#FF948A;
   --head:'Space Grotesk',system-ui,sans-serif;--body:'Inter',system-ui,-apple-system,sans-serif;
   --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
@@ -42,6 +42,11 @@ p{margin:0}
 h3{margin:0;font-family:var(--head);font-weight:700;font-size:15px}
 .grp{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--border);padding-top:14px}
 .row>h2{flex:none}
+.chart svg{width:100%;height:auto;display:block}
+.chart [data-tip]{cursor:pointer}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--text)}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}.tbl th,.tbl td{text-align:left;padding:8px 4px;border-bottom:1px solid var(--border)}.tbl th{color:var(--muted);font-weight:500}.tbl tr:last-child td{border-bottom:none}
+.readout{min-height:20px}
 .kv{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:32px;font-size:14px}
 .kv>span:first-child{color:var(--muted)}.kv>b{font-weight:600;text-align:right}
 .seg{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
@@ -132,6 +137,7 @@ select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:
   <button data-tab="today"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><span>Aujourd'hui</span></button>
   <button data-tab="plan"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M4 11h16"></path><path d="M8 15h2M14 15h2"></path></svg><span>Plan</span></button>
   <button data-tab="journal"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h11"></path><path d="M9 8h6"></path></svg><span>Journal</span></button>
+  <button data-tab="data"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11M12 20V4M19 20v-6"></path></svg><span>Données</span></button>
   <button data-tab="settings"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg><span>Réglages</span></button>
 </div></nav>
 <script src="engine.js"></script>
@@ -524,11 +530,124 @@ function vSettings() {
   return h;
 }
 
+// ---------- Page Données ----------
+var DATA = { at: 0, list: null, loading: false, err: false };
+function loadData() {
+  if (!ivReady()) return;
+  loadActs(false);
+  if (DATA.loading || DATA.err || (DATA.list && Date.now() - DATA.at < 30 * 60000)) return;
+  DATA.loading = true; var t = today();
+  ivFetch("/activities?oldest=" + E.addDays(t, -84) + "&newest=" + t).then(function (list) {
+    DATA.list = (list || []).map(actInfo); DATA.at = Date.now(); DATA.loading = false; render();
+  }).catch(function () { DATA.loading = false; DATA.err = true; render(); });
+}
+function dataRuns() {
+  var out = [];
+  if (DATA.list) DATA.list.forEach(function (a) { if (a.run) out.push({ date: a.date, min: a.min, hr: a.hr, cad: a.cad, hi: a.hiShare }); });
+  else DB.logs.forEach(function (l) {
+    var m = l.actualMin || (l.activity && l.activity.min) || l.plannedMin;
+    if (m) out.push({ date: l.date, min: Math.round(m), hr: (l.activity && l.activity.hr) || null, cad: (l.activity && l.activity.cad) || l.cad || null, hi: l.hiShare != null ? l.hiShare : null });
+  });
+  return out.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+}
+var VW = 320, VH = 150, PL = 30, PR = 10, PT = 10, PB = 22;
+function shortDate(d) { return +d.slice(8) + "/" + d.slice(5, 7); }
+function niceMax(v) { var st = [10, 20, 30, 40, 50, 60, 90, 120, 150, 180, 240, 300, 360, 480, 600]; for (var i = 0; i < st.length; i++) if (v <= st[i]) return st[i]; return Math.ceil(v / 60) * 60; }
+function gridSvg(max, min) {
+  min = min || 0;
+  var g = "";
+  [0, 0.5, 1].forEach(function (f) {
+    var y = PT + (VH - PT - PB) * (1 - f);
+    g += '<line x1="' + PL + '" x2="' + (VW - PR) + '" y1="' + y + '" y2="' + y + '" stroke="var(--border)" stroke-width="1"></line><text x="' + (PL - 6) + '" y="' + (y + 3.5) + '" text-anchor="end" font-size="10" fill="var(--muted)">' + Math.round(min + (max - min) * f) + "</text>";
+  });
+  return g;
+}
+function barChart(items, max) {
+  var n = items.length, pw = VW - PL - PR, col = pw / n, bw = Math.min(22, col - 6), ph = VH - PT - PB, g = gridSvg(max);
+  items.forEach(function (it, i) {
+    var x = PL + col * i + (col - bw) / 2, h = Math.max(it.v ? 2 : 0, it.v / max * ph), y = PT + ph - h;
+    g += '<rect x="' + x + '" y="' + y + '" width="' + bw + '" height="' + h + '" rx="3" fill="' + (it.cur ? "var(--accent)" : "var(--accent-dim)") + '"></rect>';
+    if (i % 2 === (n - 1) % 2) g += '<text x="' + (x + bw / 2) + '" y="' + (VH - 6) + '" text-anchor="middle" font-size="10" fill="var(--muted)">' + esc(it.label) + "</text>";
+    g += '<rect x="' + (PL + col * i) + '" y="' + PT + '" width="' + col + '" height="' + ph + '" fill="transparent" data-tip="' + esc(it.tip) + '"></rect>';
+  });
+  return '<svg viewBox="0 0 ' + VW + " " + VH + '" role="img" aria-label="Histogramme">' + g + "</svg>";
+}
+function lineChart(series, max, refs, label, min) {
+  min = min || 0;
+  var ds = []; series.forEach(function (s) { s.pts.forEach(function (p) { ds.push(Date.parse(p.d)); }); });
+  if (!ds.length) return "";
+  var d0 = Math.min.apply(null, ds), d1 = Math.max.apply(null, ds), pw = VW - PL - PR - 8, ph = VH - PT - PB;
+  var X = function (d) { return PL + 4 + (d1 === d0 ? pw / 2 : (Date.parse(d) - d0) / (d1 - d0) * pw); }, Y = function (v) { return PT + ph * (1 - (v - min) / (max - min)); };
+  var g = gridSvg(max, min);
+  (refs || []).forEach(function (r) { g += '<line x1="' + PL + '" x2="' + (VW - PR) + '" y1="' + Y(r.y) + '" y2="' + Y(r.y) + '" stroke="var(--muted)" stroke-width="1" stroke-dasharray="4 4"></line><text x="' + (VW - PR) + '" y="' + (Y(r.y) - 4) + '" text-anchor="end" font-size="10" fill="var(--muted)">' + esc(r.label) + "</text>"; });
+  g += '<text x="' + PL + '" y="' + (VH - 6) + '" font-size="10" fill="var(--muted)">' + shortDate(new Date(d0).toISOString().slice(0, 10)) + '</text><text x="' + (VW - PR) + '" y="' + (VH - 6) + '" text-anchor="end" font-size="10" fill="var(--muted)">' + shortDate(new Date(d1).toISOString().slice(0, 10)) + "</text>";
+  series.forEach(function (s) {
+    if (s.pts.length > 1) g += '<polyline fill="none" stroke="' + s.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="' + s.pts.map(function (p) { return X(p.d).toFixed(1) + "," + Y(p.v).toFixed(1); }).join(" ") + '"></polyline>';
+  });
+  series.forEach(function (s) { s.pts.forEach(function (p) {
+    g += '<circle cx="' + X(p.d).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="4" fill="' + s.color + '" stroke="var(--surface)" stroke-width="2"></circle><circle cx="' + X(p.d).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="14" fill="transparent" data-tip="' + esc(p.tip) + '"></circle>';
+  }); });
+  return '<svg viewBox="0 0 ' + VW + " " + VH + '" role="img" aria-label="' + esc(label) + '">' + g + "</svg>";
+}
+function legend(items) { return '<div class="legend">' + items.map(function (i) { return '<span><i style="background:' + i[1] + '"></i>' + esc(i[0]) + "</span>"; }).join("") + "</div>"; }
+function chartCard(title, sub, body, table) {
+  return '<section class="card chart"><div><h2>' + esc(title) + '</h2><p class="muted">' + esc(sub) + "</p></div>" + body + '<p class="muted readout" aria-live="polite">Touche un point ou une barre pour voir la valeur.</p>' + (table ? '<details class="more"><summary>Voir le tableau</summary>' + table + "</details>" : "") + "</section>";
+}
+function tbl(head, rows) { return '<table class="tbl"><thead><tr>' + head.map(function (x) { return "<th>" + esc(x) + "</th>"; }).join("") + "</tr></thead><tbody>" + rows.map(function (r) { return "<tr>" + r.map(function (x) { return "<td>" + esc(x) + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table>"; }
+
+function vData() {
+  var s = S(), t = today(), h = hdr("Ce que disent tes sorties", "Données");
+  var runs = dataRuns(), monday = E.mondayOf(t);
+  if (!ivReady() && !DB.logs.length) return h + '<section class="card"><h2>Pas encore de données</h2><p class="muted">Relie Intervals.icu dans les réglages pour récupérer tes sorties depuis ta montre, ou enregistre tes séances dans le journal.</p><button class="small" data-act="settings">Réglages</button></section>';
+  if (ivReady() && !DATA.list && !DATA.err) h += '<p class="muted">Chargement de tes sorties…</p>';
+  if (DATA.err) h += '<div class="notice err">Impossible de lire Intervals.icu : les chiffres ci-dessous viennent seulement de ton journal.</div>';
+  else if (!DATA.list && DB.logs.length) h += '<div class="notice">Pour l\'instant, ces chiffres viennent de ton journal.</div>';
+  // semaines
+  var weeks = [];
+  for (var i = 9; i >= 0; i--) {
+    var m0 = E.addDays(monday, -7 * i), m1 = E.addDays(m0, 6);
+    var tot = runs.filter(function (r) { return r.date >= m0 && r.date <= m1; }).reduce(function (u, r) { return u + r.min; }, 0);
+    weeks.push({ label: shortDate(m0), v: tot, cur: i === 0, tip: "Semaine du " + E.longDate(m0) + " : " + hm(tot) + " de course" });
+  }
+  var prev4 = weeks.slice(5, 9).reduce(function (u, w) { return u + w.v; }, 0) / 4;
+  var since30 = E.addDays(t, -30), longest = runs.filter(function (r) { return r.date >= since30; }).reduce(function (u, r) { return Math.max(u, r.min); }, 0);
+  h += '<section class="card"><h2>En un coup d\'œil</h2><div class="grid4">' + stat(hm(weeks[9].v), "cette semaine") + stat(hm(prev4), "moyenne 4 semaines") + stat(longest ? hm(longest) : "—", "plus longue sortie, 30 j") + stat(longest ? hm(Math.round(longest * 1.1)) : "—", "plafond de la prochaine") + '</div><p class="muted">Le plafond est 110 % de ta plus longue sortie des 30 derniers jours : au-delà, le risque de blessure monte.</p></section>';
+  // volume
+  var max = niceMax(Math.max.apply(null, weeks.map(function (w) { return w.v; }).concat([30])));
+  h += chartCard("Volume par semaine", "Minutes de course, 10 dernières semaines", barChart(weeks, max), tbl(["Semaine du", "Course"], weeks.slice().reverse().map(function (w) { return [w.label, hm(w.v)]; })));
+  // douleur
+  var logs = s.logs.slice(-12);
+  if (logs.length) {
+    var C1 = "var(--s1)", C2 = "var(--s2)", C3 = "var(--s3)";
+    var ser = [{ name: "Pendant", color: C1, k: "during" }, { name: "Juste après", color: C2, k: "after" }, { name: "Lendemain matin", color: C3, k: "morning" }].map(function (x) {
+      return { name: x.name, color: x.color, pts: logs.filter(function (l) { return l[x.k] != null; }).map(function (l) { return { d: l.date, v: l[x.k], tip: cap(E.longDate(l.date)) + " · " + x.name.toLowerCase() + " : " + l[x.k] + "/10" }; }) };
+    });
+    h += chartCard("Douleur au tibia", "Sur 10, séance par séance. Vise 3 ou moins.", legend(ser.map(function (x) { return [x.name, x.color]; })) + lineChart(ser, 10, [{ y: 3, label: "3 : limite verte" }, { y: 5, label: "5 : ralentis" }], "Douleur par séance"),
+      tbl(["Date", "Pendant", "Après", "Matin"], logs.slice().reverse().map(function (l) { return [shortDate(l.date), l.during, l.after, l.morning == null ? "—" : l.morning]; })));
+  }
+  // cadence
+  var cr = runs.filter(function (r) { return r.cad; }).slice(-14);
+  if (cr.length) h += chartCard("Cadence", "Pas par minute, par sortie. Cible : 165 ou plus.", lineChart([{ name: "Cadence", color: "var(--accent)", pts: cr.map(function (r) { return { d: r.date, v: r.cad, tip: cap(E.longDate(r.date)) + " : " + r.cad + " pas/min" }; }) }], 180, [{ y: 165, label: "165" }], "Cadence par sortie", 140),
+    tbl(["Date", "Cadence"], cr.slice().reverse().map(function (r) { return [shortDate(r.date), r.cad + " pas/min"]; })));
+  // forme du matin
+  var wl = (WELL.list || []).filter(function (w) { return w.date >= E.addDays(t, -30); });
+  [["hrv", "Variabilité cardiaque (VFC)", "ms, 30 derniers jours. Plus haut = mieux récupéré.", 120, "ms"], ["rhr", "Pouls au repos", "battements par minute, 30 derniers jours. Plus bas = mieux récupéré.", 100, "bpm"]].forEach(function (c) {
+    var pts = wl.filter(function (w) { return w[c[0]]; }).map(function (w) { return { d: w.date, v: w[c[0]], tip: cap(E.longDate(w.date)) + " : " + w[c[0]] + " " + c[4] }; });
+    if (pts.length > 1) { var vs = pts.map(function (p) { return p.v; }), mn = Math.floor((Math.min.apply(null, vs) - 5) / 10) * 10, mx = Math.ceil((Math.max.apply(null, vs) + 5) / 10) * 10; h += chartCard(c[1], c[2], lineChart([{ name: c[1], color: "var(--accent)", pts: pts }], mx, null, c[1], mn), tbl(["Date", c[4]], pts.slice().reverse().map(function (p) { return [shortDate(p.d), p.v]; }))); }
+  });
+  // dernières sorties
+  var last = runs.slice(-8).reverse();
+  if (last.length) h += '<section class="card"><h2>Dernières sorties</h2>' + tbl(["Date", "Durée", "FC moy.", "Cadence", "Hors Z1"], last.map(function (r) { return [shortDate(r.date), hm(r.min), r.hr || "—", r.cad || "—", r.hi != null ? Math.round(r.hi * 100) + " %" : "—"]; })) + '<p class="muted">« Hors Z1 » = part du temps au-dessus de l\'endurance' + (DB.profile.hrTrusted ? "." : " (indicatif tant que tes zones ne sont pas confirmées).") + "</p></section>";
+  if (!runs.length) h += '<section class="card"><p class="muted">Aucune course enregistrée pour le moment. Les graphiques se rempliront dès tes prochaines sorties.</p></section>';
+  return h;
+}
+
 // ---------- Rendu et événements ----------
 function render() {
   SESSIONS = {};
   if (UI.tab === "today" || UI.tab === "plan") loadActs(false);
-  var v = { today: vToday, journal: vJournal, plan: vPlan, settings: vSettings }[UI.tab] || vToday;
+  if (UI.tab === "data") loadData();
+  var v = { today: vToday, journal: vJournal, plan: vPlan, data: vData, settings: vSettings }[UI.tab] || vToday;
   document.getElementById("app").innerHTML = v();
   document.querySelectorAll("nav.tabs button").forEach(function (b) { if (b.dataset.tab === UI.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
 }
@@ -552,6 +671,8 @@ function readRace() {
 }
 
 document.addEventListener("click", function (ev) {
+  var tip = ev.target.closest("[data-tip]");
+  if (tip) { var rd = tip.closest(".chart").querySelector(".readout"); if (rd) rd.textContent = tip.dataset.tip; return; }
   var b = ev.target.closest("[data-act],[data-tab]"); if (!b) return;
   if (b.closest("nav.tabs")) { go(b.dataset.tab); return; }
   var a = b.dataset.act, t = today(), p = DB.profile;
