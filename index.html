@@ -134,7 +134,7 @@ var E = window.Engine;
 var KEY = "naqrun.v1";
 var DEFAULT = { profile: { startLevel: 5, ladderV: 3, cycleStart: null, switchDate: null, hop: false, heel: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "", hoursMax: 10, h0: 4.5, ref: { km: 29.6, dplus: 637, hours: 3.45 }, race: null }, logs: [], sent: {} };
 var RACE_EXAMPLE = { name: "Raid de l'Archange", date: "2027-06-17", km: 280, dplus: 3000, stages: 3, autonomy: true, terrain: "roulant", night: false, cutoffH: null, confirmed: false };
-var KINDS = { palier: "Footing palier", cadence: "Footing cadence", rando: "Rando-course", footing: "Footing", longue: "Sortie longue", cote: "Montées sur la côte", velo: "Vélo / elliptique", autre: "Autre course" };
+var KINDS = { palier: "Footing progression", cadence: "Footing cadence", footing: "Footing facile", rando: "Rando-course", longue: "Sortie longue", cote: "Côtes marchées", velo: "Vélo / elliptique", autre: "Autre course" };
 
 function load() {
   try {
@@ -313,7 +313,7 @@ function vToday() {
   }
   if (s.lastVerdict) {
     var lastLog = s.logs[s.logs.length - 1];
-    var txt = s.mode === "ultra" ? "Programme en cours." : s.done ? "Paliers terminés : passe le test de passage (onglet Plan)." : s.streak + " séance palier verte sur 2 pour passer au palier " + Math.min(s.level + 1, 15) + ".";
+    var txt = s.mode === "ultra" ? "Programme en cours." : s.done ? "Paliers terminés : passe le test de passage (onglet Plan)." : s.streak + " footing progression vert sur 2 pour passer au palier " + Math.min(s.level + 1, 15) + ".";
     h += '<section class="card"><div class="row"><h2>Dernière séance</h2>' + chip(lastLog._v, lastLog._provisional) + '</div><p class="muted">' + esc(txt) + "</p>" + (s.mode === "reprise" ? '<div class="bar" aria-hidden="true"><div style="width:' + Math.round(Math.min(s.level - 1, E.MAX_LEVEL) / E.MAX_LEVEL * 100) + '%"></div></div><div class="row"><span class="muted">Reprise</span><span class="muted">Palier ' + Math.min(s.level, 15) + " / 15</span></div>" : "") + "</section>";
   }
   if (race) {
@@ -375,7 +375,7 @@ function vPlan() {
   var s = S(), t = today(), p = DB.profile, h = "", monday = E.mondayOf(t);
   h += '<header class="hdr"><div><p class="muted">' + (s.mode === "ultra" ? "Programme ultra-trail · finisher" : "Reprise de charge · périostite") + '</p><h1>Plan</h1></div></header>';
   if (s.mode === "reprise") {
-    h += '<section class="card"><h2>Cette semaine</h2><p class="muted">' + (E.isConsolidation(p, monday) ? "Semaine de consolidation : volume réduit d’environ 25 %, pas de montée de palier. " : "") + "Seule la séance palier fait progresser, de 10 % au plus. Une semaine sur quatre est une semaine de consolidation.</p>" + weekList(E.weekSessions(p, s, monday, null), "w0s") + "</section>";
+    h += '<section class="card"><h2>Cette semaine</h2><p class="muted">' + (E.isConsolidation(p, monday) ? "Semaine de consolidation : volume réduit d’environ 25 %, pas de montée de palier. " : "") + "Seul le footing progression fait monter de palier, de 10 % au plus. Une semaine sur quatre est une semaine de consolidation.</p>" + weekList(E.weekSessions(p, s, monday, null), "w0s") + "</section>";
     if (ACTS.list) {
       var planned = E.weekSessions(p, s, monday, null).map(function (x) { return x.date; });
       var extra = ACTS.list.filter(function (a) { return a.date >= monday && a.date <= t && planned.indexOf(a.date) < 0; });
@@ -451,8 +451,8 @@ function vProj() {
   var ry = p.rythme || "prudent";
   var rb = function (v, l) { return '<button class="small' + (ry === v ? " primary" : "") + '" data-act="rythme" data-v="' + v + '" aria-pressed="' + (ry === v) + '">' + l + "</button>"; };
   h += '<section class="card"><h2>Rythme de progression</h2><div class="btns">' + rb("prudent", "Prudent") + rb("dynamique", "Dynamique") + rb("limite", "Limite") + "</div>" +
-    (ry === "limite" ? '<p class="muted">Limite : chaque course verte qui compte (palier ou footing cadence) fait monter d\'un palier, jusqu\'à 2 paliers par semaine. Borne dure : jamais plus de 10 % au-dessus de ta plus longue sortie réelle des 30 derniers jours. Les règles douleur, la semaine de consolidation et les ajustements selon tes données restent actifs. C\'est le rythme le plus rapide que la science permet, et celui où il faut le plus écouter le journal de douleur.</p></section>' : "") +
-    (ry === "limite" ? "" : '<p class="muted">' + (dyn ? "Dynamique : le footing palier et le footing cadence verts comptent tous les deux, soit jusqu\'à un palier par semaine (+10 % au plus), hors semaine de consolidation. La préparation de course compte dès que la reprise atteint le relief. Les règles douleur ne changent pas : un orange bloque la montée, un rouge fait reculer." : "Prudent : seule la séance palier compte, soit un palier toutes les deux semaines (+10 % au plus). La préparation de course compte après le test de passage.") + "</p></section>");
+    (ry === "limite" ? '<p class="muted">Limite : chaque footing progression ou footing cadence vert fait monter d\'un palier, jusqu\'à 2 paliers par semaine. Borne dure : jamais plus de 10 % au-dessus de ta plus longue sortie réelle des 30 derniers jours. Les règles douleur, la semaine de consolidation et les ajustements selon tes données restent actifs. C\'est le rythme le plus rapide que la science permet, et celui où il faut le plus écouter le journal de douleur.</p></section>' : "") +
+    (ry === "limite" ? "" : '<p class="muted">' + (dyn ? "Dynamique : le footing progression et le footing cadence verts comptent tous les deux, soit jusqu\'à un palier par semaine (+10 % au plus), hors semaine de consolidation. La préparation de course compte dès que la reprise atteint le relief. Les règles douleur ne changent pas : un orange bloque la montée, un rouge fait reculer." : "Prudent : seul le footing progression compte, soit un palier toutes les deux semaines (+10 % au plus). La préparation de course compte après le test de passage.") + "</p></section>");
   h += '<section class="card"><div class="row"><h2>Grandes étapes</h2></div>' +
     '<p>Fin des paliers de reprise : <strong>' + esc((function () { var w = pr.weeks.filter(function (x) { return x.mode === "passage"; })[0]; return w ? cap(E.longDate(w.monday)) : (s.mode === "ultra" ? "faite" : "au-delà de 9 mois"); })()) + "</strong></p>" +
     '<p>Début du programme ultra : <strong>' + esc(pr.switchDate ? cap(E.longDate(pr.switchDate)) : "à définir") + "</strong></p>" +

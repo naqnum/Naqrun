@@ -87,7 +87,7 @@ assert.equal(cw[0].level, 9); assert.ok(cw[0].consolidation);
 const prc = E.projection({ ...cp, rythme: 'dynamique' }, E.computeState(cp, [], '2026-11-19'), '2026-11-19', null, 40);
 console.log('dynamique + consolidation : base', prc.baseDate, 'programme', prc.switchDate);
 // ancienne échelle → nouvelle
-assert.equal(E.LEVELS[4].title, '2 × 14 min (2 min de marche entre)'); assert.equal(E.LEVELS[9].run, 40);
+assert.equal(E.LEVELS[4].title, '2 × 14 min'); assert.equal(E.LEVELS[9].run, 40);
 // « Orange pendant » : douleur pendant seulement
 const j = d => ({ ...g(d), during: 5, after: 2, morning: 0 });
 assert.equal(E.verdict(j('2026-11-24')), 'jaune');
