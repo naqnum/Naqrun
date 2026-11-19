@@ -148,4 +148,12 @@ assert.ok(pal.done && pal.date === '2026-11-18');
 assert.equal(cad.date, '2026-11-20'); assert.ok(cad.autoMoved);
 assert.equal(ran.date, '2026-11-22');
 assert.equal(E.sessionsOn(p5, s5, '2026-11-19', null, ctx).filter(x => x.kind !== 'velo').length, 0);
+// « Je ne peux pas faire la séance » : vélo à la place, version allégée, repos choisi
+const swp = { ...p5, swaps: { '2026-11-24|palier': 'velo', '2026-11-26|cadence': 'light' } };
+const sv = E.sessionsOn(swp, s5, '2026-11-24', null, {}).find(x => x.kind === 'velo' && x.swapped);
+assert.ok(sv && sv.origKind === 'palier' && E.sessionKey(sv) === '2026-11-24|palier');
+const sl = E.sessionsOn(swp, s5, '2026-11-26', null, {}).find(x => x.lightened);
+assert.ok(sl && E.totalMin(sl.blocks) < E.totalMin(E.sessionsOn(p5, s5, '2026-11-26', null, {})[0].blocks));
+const sr = E.computeState({ ...p5, manualRest: '2026-11-20' }, [], '2026-11-19');
+assert.ok(sr.resting && E.sessionsOn({ ...p5, manualRest: '2026-11-20' }, sr, '2026-11-20', null, {}).every(x => x.kind === 'velo'));
 console.log('OK');

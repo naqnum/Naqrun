@@ -134,6 +134,7 @@
     s.longest = longest30(sorted, ctx.acts, today);
     s.cap = s.longest ? Math.round(s.longest * 1.1) : null; // plafond de la prochaine course (+10 %)
     s.done = s.level > MAX_LEVEL;
+    if (profile.manualRest && (!s.restUntil || profile.manualRest > s.restUntil)) s.restUntil = profile.manualRest; // « j'ai mal » : repos choisi
     s.resting = !!(s.restUntil && today <= s.restUntil);
     return s;
   }
@@ -354,7 +355,7 @@
 
   // ---------- Séances d'une date ----------
   // profile.moves : { "AAAA-MM-JJ|type": "AAAA-MM-JJ" (reportée) ou "skip" (annulée) }
-  function sessionKey(x) { return (x.origDate || x.date) + "|" + x.kind; }
+  function sessionKey(x) { return (x.origDate || x.date) + "|" + (x.origKind || x.kind); }
   function rawSessions(profile, state, from, to, race) {
     var out = [];
     if (state.mode === "reprise") {
@@ -401,10 +402,13 @@
   function sessionsOn(profile, state, date, race, ctx) {
     if (state.stopped) return [];
     if (state.mode === "ultra" && !race) return [];
-    var moves = profile.moves || {};
+    var moves = profile.moves || {}, swaps = profile.swaps || {};
     var all = rawSessions(profile, state, addDays(date, -14), addDays(date, 14), race).map(function (x) {
-      var mv = moves[x.date + "|" + x.kind];
+      var key = x.date + "|" + x.kind, mv = moves[key], sw = swaps[key];
       if (mv === "skip") return null;
+      // « je ne peux pas faire la séance » : vélo facile à la place, ou version allégée
+      if (sw === "velo" && x.kind !== "velo") x = Object.assign({}, x, { origKind: x.kind, kind: "velo", sport: "Ride", level: null, title: "Vélo / elliptique · facile", blocks: bike(clamp(totalMin(x.blocks) * 0.9, 30, 90)), note: "Remplace la course : endurance sans impact pour le tibia. Le palier attend ta prochaine vraie course.", swapped: true });
+      else if (sw === "light" && x.kind !== "velo") x = Object.assign({}, x, { origKind: x.kind, title: x.title + " (allégée)", blocks: scaleRuns(x.blocks, 0.7), note: (x.note ? x.note + " " : "") + "Version allégée de 30 % : mieux vaut une séance courte qu'une séance sautée.", lightened: true });
       return mv ? Object.assign({}, x, { origDate: x.date, date: mv, manual: true }) : x;
     }).filter(Boolean);
     if (ctx && ctx.runs && ctx.today) {
