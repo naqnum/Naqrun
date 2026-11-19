@@ -195,6 +195,23 @@ function ivError(e) {
   return "Intervals.icu a répondu une erreur (" + e.message + ").";
 }
 var SESSIONS = {};
+// Sorties réellement faites (Garmin → Intervals.icu), mises en cache 30 min
+var ACTS = { at: 0, list: null, loading: false };
+function isRun(t) { return /Run|Hike|Walk/i.test(t || ""); }
+function loadActs(force) {
+  if (!ivReady() || ACTS.loading || (!force && ACTS.list && Date.now() - ACTS.at < 30 * 60000)) return;
+  var t = today(); ACTS.loading = true;
+  ivFetch("/activities?oldest=" + E.addDays(E.mondayOf(t), -7) + "&newest=" + t).then(function (list) {
+    ACTS.list = (list || []).map(function (a) { return { date: String(a.start_date_local || "").slice(0, 10), run: isRun(a.type), type: a.type, min: Math.round((a.moving_time || 0) / 60), name: a.name || "" }; });
+    ACTS.at = Date.now(); ACTS.loading = false; render();
+  }).catch(function () { ACTS.loading = false; });
+}
+// Une course faite ce jour-là (Intervals ou journal) ?
+function ranOn(d) {
+  if (DB.logs.some(function (l) { return l.date === d; })) return true;
+  return !!(ACTS.list && ACTS.list.some(function (a) { return a.date === d && a.run; }));
+}
+function actsOn(d) { return (ACTS.list || []).filter(function (a) { return a.date === d; }); }
 function sendSession(key) {
   var session = SESSIONS[key], msgKey = "send-" + key;
   if (!ivReady()) { UI.msg[msgKey] = { t: "err", m: "Renseigne d'abord ton compte Intervals.icu dans les réglages (roue crantée sur l'écran Aujourd'hui)." }; render(); return; }
@@ -239,7 +256,12 @@ function weekList(sessions, prefix) {
   return sessions.map(function (x, j) {
     var key = prefix + j; SESSIONS[key] = x;
     var open = UI.open === key;
-    return '<details class="sessd" data-key="' + key + '"' + (open ? " open" : "") + '><summary class="sess"><span>' + esc(cap(E.longDate(x.date))) + (x.origDate ? " (reportée)" : "") + '<br><span class="muted">' + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><span class="chev" aria-hidden="true">›</span></summary>' +
+    var t = today(), st = "";
+    if (x.date <= t && ACTS.list) {
+      var done = actsOn(x.date).some(function (a) { return x.kind === "velo" ? !a.run : a.run; }) || (x.kind !== "velo" && DB.logs.some(function (l) { return l.date === x.date; }));
+      st = done ? ' <span class="chip vert">Faite</span>' : (x.date < t ? ' <span class="chip soft">Non faite</span>' : "");
+    }
+    return '<details class="sessd" data-key="' + key + '"' + (open ? " open" : "") + '><summary class="sess"><span>' + esc(cap(E.longDate(x.date))) + (x.origDate ? " (reportée)" : "") + st + '<br><span class="muted">' + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><span class="chev" aria-hidden="true">›</span></summary>' +
       '<div class="sessbody"><span class="chip soft" style="align-self:flex-start">' + esc(KINDS[x.kind] || x.kind) + "</span>" + stepsHtml(x.blocks) + (x.note ? '<div class="notice">' + esc(x.note) + "</div>" : "") +
       '<button class="small primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix</button>" + msgHtml(key) + moveHtml(x, key) + "</div></details>";
   }).join("");
@@ -264,7 +286,10 @@ function vToday() {
   if (!s.stopped) {
     var list = E.sessionsOn(p, s, t, race);
     if (s.mode === "ultra" && !race) h += '<section class="card"><h2>Définis ta course</h2><p class="muted">Ta reprise est validée. Renseigne ta course objectif pour générer le programme.</p><button class="primary" data-act="tab" data-tab="course">Fiche course</button></section>';
-    else if (list.length) list.forEach(function (x, i) { h += sessionCard(x, "today" + i, "Séance du jour"); });
+    else if (list.length) list.forEach(function (x, i) {
+      if (x.kind !== "velo" && ranOn(E.addDays(t, -1)) && !ranOn(t)) h += '<div class="notice">Tu as déjà couru hier. Pour le tibia, mieux vaut un jour sans course entre deux sorties : décale « ' + esc(x.title) + ' » à demain (bouton sous la séance) ou fais du vélo aujourd\'hui.</div>';
+      h += sessionCard(x, "today" + i, "Séance du jour");
+    });
     else {
       var next = null;
       for (var i = 1; i <= 14 && !next; i++) { var l2 = E.sessionsOn(p, s, E.addDays(t, i), race); if (l2.length) next = l2[0]; }
@@ -331,6 +356,11 @@ function vPlan() {
   h += '<header class="hdr"><div><p class="muted">' + (s.mode === "ultra" ? "Programme ultra-trail · finisher" : "Reprise de charge · périostite") + '</p><h1>Plan</h1></div></header>';
   if (s.mode === "reprise") {
     h += '<section class="card"><h2>Cette semaine</h2><p class="muted">' + (E.isConsolidation(p, monday) ? "Semaine de consolidation : volume réduit d’environ 25 %, pas de montée de palier. " : "") + "Seule la séance palier fait progresser, de 10 % au plus. Une semaine sur quatre est une semaine de consolidation.</p>" + weekList(E.weekSessions(p, s, monday, null), "w0s") + "</section>";
+    if (ACTS.list) {
+      var planned = E.weekSessions(p, s, monday, null).map(function (x) { return x.date; });
+      var extra = ACTS.list.filter(function (a) { return a.date >= monday && a.date <= t && planned.indexOf(a.date) < 0; });
+      if (extra.length) h += '<section class="card"><h2>Sorties hors plan cette semaine</h2>' + extra.map(function (a) { return '<div class="sess"><span>' + esc(cap(E.longDate(a.date))) + '<br><span class="muted">' + esc(a.name || a.type) + " · " + hm(a.min) + "</span></span></div>"; }).join("") + '<p class="muted">Récupérées depuis ta montre (Intervals.icu). Pense à les noter dans le journal pour qu\'elles comptent dans ta progression.</p></section>';
+    } else if (ivReady()) h += '<p class="muted">Chargement de tes sorties de la semaine…</p>';
     h += '<section class="card"><h2>Semaine prochaine</h2>' + weekList(E.weekSessions(p, s, E.addDays(monday, 7), null), "w1s") + '<p class="muted">Calculée avec ton palier actuel : elle s\'ajuste à chaque séance enregistrée.</p></section>';
     var ps = E.passage(p, s, t);
     h += '<section class="card"><h2>Test de passage vers le programme</h2>' + ps.items.map(function (it) {
@@ -441,6 +471,7 @@ function vSettings() {
 // ---------- Rendu et événements ----------
 function render() {
   SESSIONS = {};
+  if (UI.tab === "today" || UI.tab === "plan") loadActs(false);
   var v = { today: vToday, journal: vJournal, plan: vPlan, proj: vProj, course: vCourse, settings: vSettings }[UI.tab] || vToday;
   document.getElementById("app").innerHTML = v();
   document.querySelectorAll("nav.tabs button").forEach(function (b) { if (b.dataset.tab === UI.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
