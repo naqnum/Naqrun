@@ -106,7 +106,7 @@ details summary{cursor:pointer;font-size:14px;font-weight:600;min-height:32px;di
 "use strict";
 var E = window.Engine;
 var KEY = "naqrun.v1";
-var DEFAULT = { profile: { startLevel: 6, switchDate: null, hop: false, heel: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "", hoursMax: 10, h0: 4.5, ref: { km: 29.6, dplus: 637, hours: 3.45 }, race: null }, logs: [], sent: {} };
+var DEFAULT = { profile: { startLevel: 8, ladderV: 2, cycleStart: null, switchDate: null, hop: false, heel: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "", hoursMax: 10, h0: 4.5, ref: { km: 29.6, dplus: 637, hours: 3.45 }, race: null }, logs: [], sent: {} };
 var RACE_EXAMPLE = { name: "Raid de l'Archange", date: "2027-06-17", km: 280, dplus: 3000, stages: 3, autonomy: true, terrain: "roulant", night: false, cutoffH: null, confirmed: false };
 var KINDS = { palier: "Footing palier", cadence: "Footing cadence", rando: "Rando-course", footing: "Footing", longue: "Sortie longue", cote: "Montées sur la côte", velo: "Vélo / elliptique", autre: "Autre course" };
 
@@ -116,12 +116,14 @@ function load() {
     if (x && x.profile) {
       var p = Object.assign({}, DEFAULT.profile, x.profile);
       p.ref = Object.assign({}, DEFAULT.profile.ref, x.profile.ref || {});
+      if (p.ladderV !== 2) { p.startLevel = E.LADDER_V1[p.startLevel] || 8; p.ladderV = 2; } // nouvelle échelle de paliers
       return { profile: p, logs: x.logs || [], sent: x.sent || {} };
     }
   } catch (e) {}
   return JSON.parse(JSON.stringify(DEFAULT));
 }
 var DB = load();
+if (!DB.profile.cycleStart) { DB.profile.cycleStart = E.mondayOf(E.todayStr()); }
 var saveOk = true;
 function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); saveOk = true; } catch (e) { saveOk = false; } }
 var UI = { tab: (location.hash || "#today").slice(1), draft: null, msg: {}, raceDraft: null };
@@ -238,7 +240,7 @@ function vToday() {
   if (s.lastVerdict) {
     var lastLog = s.logs[s.logs.length - 1];
     var txt = s.mode === "ultra" ? "Programme en cours." : s.done ? "Paliers terminés : passe le test de passage (onglet Plan)." : s.streak + " séance palier verte sur 2 pour passer au palier " + Math.min(s.level + 1, 15) + ".";
-    h += '<section class="card"><div class="row"><h2>Dernière séance</h2>' + chip(lastLog._v, lastLog._provisional) + '</div><p class="muted">' + esc(txt) + "</p>" + (s.mode === "reprise" ? '<div class="bar" aria-hidden="true"><div style="width:' + Math.round(Math.min(s.level - 1, 15) / 15 * 100) + '%"></div></div><div class="row"><span class="muted">Reprise</span><span class="muted">Palier ' + Math.min(s.level, 15) + " / 15</span></div>" : "") + "</section>";
+    h += '<section class="card"><div class="row"><h2>Dernière séance</h2>' + chip(lastLog._v, lastLog._provisional) + '</div><p class="muted">' + esc(txt) + "</p>" + (s.mode === "reprise" ? '<div class="bar" aria-hidden="true"><div style="width:' + Math.round(Math.min(s.level - 1, E.MAX_LEVEL) / E.MAX_LEVEL * 100) + '%"></div></div><div class="row"><span class="muted">Reprise</span><span class="muted">Palier ' + Math.min(s.level, 15) + " / 15</span></div>" : "") + "</section>";
   }
   if (race) {
     var days = E.diffDays(t, race.date);
@@ -293,7 +295,7 @@ function vPlan() {
   var s = S(), t = today(), p = DB.profile, h = "", monday = E.mondayOf(t);
   h += '<header class="hdr"><div><p class="muted">' + (s.mode === "ultra" ? "Programme ultra-trail · finisher" : "Reprise de charge · périostite") + '</p><h1>Plan</h1></div></header>';
   if (s.mode === "reprise") {
-    h += '<section class="card"><h2>Cette semaine</h2><p class="muted">Seule la séance palier fait progresser. Les autres construisent l\'endurance en ménageant le tibia.</p>' + weekList(E.weekSessions(p, s, monday, null), "w0s") + "</section>";
+    h += '<section class="card"><h2>Cette semaine</h2><p class="muted">' + (E.isConsolidation(p, monday) ? "Semaine de consolidation : volume réduit d’environ 25 %, pas de montée de palier. " : "") + "Seule la séance palier fait progresser, de 10 % au plus. Une semaine sur quatre est une semaine de consolidation.</p>" + weekList(E.weekSessions(p, s, monday, null), "w0s") + "</section>";
     h += '<section class="card"><h2>Semaine prochaine</h2>' + weekList(E.weekSessions(p, s, E.addDays(monday, 7), null), "w1s") + '<p class="muted">Calculée avec ton palier actuel : elle s\'ajuste à chaque séance enregistrée.</p></section>';
     var ps = E.passage(p, s, t);
     h += '<section class="card"><h2>Test de passage vers le programme</h2>' + ps.items.map(function (it) {
@@ -362,7 +364,7 @@ function vProj() {
   h += '<header class="hdr"><div><p class="muted">Si toutes les séances restent vertes</p><h1>Projection</h1></div></header>';
   var dyn = p.rythme === "dynamique";
   h += '<section class="card"><h2>Rythme de progression</h2><div class="btns"><button class="small' + (dyn ? "" : " primary") + '" data-act="rythme" data-v="prudent" aria-pressed="' + !dyn + '">Prudent</button><button class="small' + (dyn ? " primary" : "") + '" data-act="rythme" data-v="dynamique" aria-pressed="' + dyn + '">Dynamique</button></div>' +
-    '<p class="muted">' + (dyn ? "Dynamique : le footing palier et le footing cadence verts comptent tous les deux, soit jusqu\'à un palier par semaine (+5 min). La préparation de course compte dès que la reprise atteint le relief. Les règles douleur ne changent pas : un orange bloque la montée, un rouge fait reculer." : "Prudent : seule la séance palier compte, soit un palier toutes les deux semaines. La préparation de course compte après le test de passage.") + "</p></section>";
+    '<p class="muted">' + (dyn ? "Dynamique : le footing palier et le footing cadence verts comptent tous les deux, soit jusqu\'à un palier par semaine (+10 % au plus), hors semaine de consolidation. La préparation de course compte dès que la reprise atteint le relief. Les règles douleur ne changent pas : un orange bloque la montée, un rouge fait reculer." : "Prudent : seule la séance palier compte, soit un palier toutes les deux semaines (+10 % au plus). La préparation de course compte après le test de passage.") + "</p></section>";
   h += '<section class="card"><div class="row"><h2>Grandes étapes</h2></div>' +
     '<p>Fin des paliers de reprise : <strong>' + esc((function () { var w = pr.weeks.filter(function (x) { return x.mode === "passage"; })[0]; return w ? cap(E.longDate(w.monday)) : (s.mode === "ultra" ? "faite" : "au-delà de 9 mois"); })()) + "</strong></p>" +
     '<p>Début du programme ultra : <strong>' + esc(pr.switchDate ? cap(E.longDate(pr.switchDate)) : "à définir") + "</strong></p>" +
@@ -372,7 +374,7 @@ function vProj() {
   weeks.forEach(function (w, i) {
     var mth = E.monthYear(w.monday);
     if (mth !== month) { if (body) h += body + "</section>"; month = mth; body = '<section class="card"><h2>' + esc(cap(mth)) + "</h2>"; }
-    var lab = w.mode === "programme" ? w.block + (w.choc ? " · choc" : "") + (w.light ? " · allégée" : "") : w.mode === "passage" ? "Test de passage" : "Palier " + Math.min(w.level, 15) + " · " + E.LEVELS[Math.min(w.level, 15) - 1].title;
+    var lab = w.mode === "programme" ? w.block + (w.choc ? " · choc" : "") + (w.light ? " · allégée" : "") : w.mode === "passage" ? "Test de passage" : "Palier " + Math.min(w.level, E.MAX_LEVEL) + " · " + E.LEVELS[Math.min(w.level, E.MAX_LEVEL) - 1].title + (w.consolidation ? " · consolidation" : "");
     var run = Math.round(w.runMinutes), tot = Math.round(w.minutes);
     body += '<details class="week' + (i === 0 ? " cur" : "") + '"' + (i === 0 ? " open" : "") + '><summary style="display:flex;flex-direction:column;align-items:stretch;gap:6px">' +
       '<span class="row"><span>Sem. du ' + esc(E.longDate(w.monday).replace(/^\S+ /, "")) + '</span><span class="muted">' + hm(tot) + "</span></span>" +

@@ -9,4 +9,5 @@
 - Après un changement de fichier mis en cache, incrémenter `CACHE` dans `sw.js`.
 - Séances toujours structurées en temps et zones de FC (jamais en distance ni en allure). Objectif unique : être finisher.
 - Pas de séances de renfo dans le programme (demande de l'utilisateur).
+- Paliers : chaque marche ≤ 10 % de la précédente (risque de blessure accru au-delà de 10 % de la plus longue sortie des 30 derniers jours). Une semaine de consolidation toutes les 4 semaines (remodelage osseux).
 - Ne pas affaiblir les règles de sécurité douleur (signes d'arrêt, recul sur rouge) sans demande explicite.

@@ -25,23 +25,22 @@
   var W5 = { k: "marche", min: 5, label: "Échauffement" }, C5 = { k: "marche", min: 5, label: "Retour au calme" };
   function cont(min, label) { return [W5, { k: "course", min: min, label: label || "Course facile" }, C5]; }
   var RELIEF = "Pentes douces seulement (moins de 6 %). Montées raides et descentes : en marchant.";
+  // Chaque marche ≤ 10 % de la plus longue course récente (étude Garmin-RUNSAFE, BJSM 2025)
+  function lvC(n, phase, run, label, note) { return { n: n, phase: phase, title: (phase >= 4 ? "Trail " + run + " min" : run + " min " + (phase === 3 ? "vallonné doux" : "continu")), run: run, blocks: cont(run, label), note: note }; }
   var LEVELS = [
-    { n: 1, phase: 0, title: "6 × (3 min course / 1 min marche)", run: 18, blocks: [W5, { rep: 6, steps: [{ k: "course", min: 3 }, { k: "marche", min: 1 }] }, C5] },
-    { n: 2, phase: 0, title: "5 × (5 min course / 1 min marche)", run: 25, blocks: [W5, { rep: 5, steps: [{ k: "course", min: 5 }, { k: "marche", min: 1 }] }, C5] },
-    { n: 3, phase: 0, title: "4 × (8 min course / 1 min marche)", run: 32, blocks: [W5, { rep: 4, steps: [{ k: "course", min: 8 }, { k: "marche", min: 1 }] }, C5] },
-    { n: 4, phase: 1, title: "30 min continu", run: 30, blocks: cont(30) },
-    { n: 5, phase: 1, title: "35 min continu", run: 35, blocks: cont(35) },
-    { n: 6, phase: 1, title: "40 min continu", run: 40, blocks: cont(40) },
-    { n: 7, phase: 1, title: "45 min continu", run: 45, blocks: cont(45) },
-    { n: 8, phase: 2, title: "50 min continu", run: 50, blocks: cont(50) },
-    { n: 9, phase: 2, title: "55 min continu", run: 55, blocks: cont(55) },
-    { n: 10, phase: 2, title: "60 min continu", run: 60, blocks: cont(60) },
-    { n: 11, phase: 3, title: "50 min vallonné doux", run: 50, blocks: cont(50, "Course facile, vallonné doux"), note: RELIEF },
-    { n: 12, phase: 3, title: "60 min vallonné doux", run: 60, blocks: cont(60, "Course facile, vallonné doux"), note: RELIEF },
-    { n: 13, phase: 4, title: "Trail 70 min", run: 70, blocks: cont(70, "Trail facile"), note: "Montées raides marchées, descentes marchées." },
-    { n: 14, phase: 4, title: "Trail 80 min", run: 80, blocks: cont(80, "Trail facile"), note: "Montées raides marchées, descentes douces courues." },
-    { n: 15, phase: 4, title: "Trail 90 min", run: 90, blocks: cont(90, "Trail facile"), note: "Montées raides marchées, descentes courues sans freiner fort." },
+    { n: 1, phase: 0, title: "5 × (4 min course / 1 min marche)", run: 20, blocks: [W5, { rep: 5, steps: [{ k: "course", min: 4 }, { k: "marche", min: 1 }] }, C5] },
+    { n: 2, phase: 0, title: "4 × (5 min 30 course / 1 min marche)", run: 22, blocks: [W5, { rep: 4, steps: [{ k: "course", min: 5.5 }, { k: "marche", min: 1 }] }, C5] },
+    { n: 3, phase: 0, title: "3 × (8 min course / 1 min marche)", run: 24, blocks: [W5, { rep: 3, steps: [{ k: "course", min: 8 }, { k: "marche", min: 1 }] }, C5] },
+    lvC(4, 1, 27), lvC(5, 1, 30), lvC(6, 1, 33), lvC(7, 1, 36), lvC(8, 1, 40), lvC(9, 1, 44), lvC(10, 1, 48),
+    lvC(11, 2, 53), lvC(12, 2, 58),
+    lvC(13, 3, 64, "Course facile, vallonné doux", RELIEF), lvC(14, 3, 70, "Course facile, vallonné doux", RELIEF),
+    lvC(15, 4, 77, "Trail facile", "Montées raides marchées, descentes marchées."),
+    lvC(16, 4, 85, "Trail facile", "Montées raides marchées, descentes douces courues."),
+    lvC(17, 4, 90, "Trail facile", "Montées raides marchées, descentes courues sans freiner fort."),
   ];
+  var RELIEF_LEVEL = 13, RETURN_LEVEL = 12; // 64 min vallonné ; retour à 58 min continu après un rouge en programme
+  // Ancienne échelle (v1/v2, 15 paliers) → nouvelle
+  var LADDER_V1 = [0, 1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
   var MAX_LEVEL = LEVELS.length;
   var PHASES = ["Repli course/marche", "Continu sur le plat", "Volume", "Relief doux", "Trail"];
   var CADENCE = "Cadence visée : 165 à 170 pas/min (alerte cadence sur la Fenix).";
@@ -56,6 +55,14 @@
     return "vert";
   }
 
+  // ---------- Semaines de consolidation ----------
+  // Toutes les 4 semaines : pas de montée de palier, ≈ 25 % de volume en moins (cycle de remodelage osseux ≈ 3 semaines).
+  function isConsolidation(profile, date) {
+    if (!profile.cycleStart) return false;
+    var k = Math.floor(diffDays(mondayOf(profile.cycleStart), mondayOf(date)) / 7);
+    return k >= 0 && k % 4 === 3;
+  }
+
   // ---------- Rejouer l'historique ----------
   function computeState(profile, logs, today) {
     var s = { mode: "reprise", level: profile.startLevel || 6, streak: 0, stopped: false, lastDate: null, lastVerdict: null, restUntil: null, ultraStart: null, reduce: {}, events: [], returned: false };
@@ -67,11 +74,11 @@
       if (profile.switchDate && s.mode === "reprise" && !s.returned && log.date >= profile.switchDate) { s.mode = "ultra"; s.ultraStart = profile.switchDate; }
       if (v === "stop") {
         s.stopped = !(profile.clearedStop && profile.clearedStop >= log.date);
-        if (s.mode === "ultra") { s.mode = "reprise"; s.returned = true; s.level = 10; } else s.level = Math.max(1, Math.min(s.level, MAX_LEVEL) - 2);
+        if (s.mode === "ultra") { s.mode = "reprise"; s.returned = true; s.level = RETURN_LEVEL; } else s.level = Math.max(1, Math.min(s.level, MAX_LEVEL) - 2);
         s.streak = 0; s.restUntil = addDays(log.date, 2); s.events.push({ date: log.date, t: "Signe d'arrêt" }); return;
       }
       if (v === "rouge") {
-        if (s.mode === "ultra") { s.mode = "reprise"; s.returned = true; s.level = 10; s.events.push({ date: log.date, t: "Rouge : retour en reprise (60 min continu)" }); }
+        if (s.mode === "ultra") { s.mode = "reprise"; s.returned = true; s.level = RETURN_LEVEL; s.events.push({ date: log.date, t: "Rouge : retour en reprise (58 min continu)" }); }
         else { s.level = Math.max(1, Math.min(s.level, MAX_LEVEL) - 2); s.events.push({ date: log.date, t: "Rouge : recul de 2 paliers" }); }
         s.streak = 0; s.restUntil = addDays(log.date, 2); return;
       }
@@ -79,6 +86,7 @@
       if (v === "orange") { s.streak = 0; return; }
       // vert : seules les séances « palier » font monter
       // rythme « dynamique » : le footing cadence vert compte aussi → jusqu'à un palier par semaine
+      if (isConsolidation(profile, log.date)) return;
       if (log.kind === "palier" || log.kind == null || (profile.rythme === "dynamique" && log.kind === "cadence")) {
         s.streak++;
         if (s.streak >= 2 && s.level <= MAX_LEVEL) { s.level++; s.streak = 0; s.events.push({ date: log.date, t: "Palier suivant" }); }
@@ -124,13 +132,15 @@
 
   // Semaine type de reprise : mardi palier, jeudi cadence, vendredi vélo, samedi rando-course
   function repriseWeek(profile, state, monday) {
-    var lv = LEVELS[Math.min(state.level, MAX_LEVEL) - 1], d = function (n) { return addDays(monday, n); };
-    var cad = Math.max(20, r5(lv.run * 0.6));
+    var cons = isConsolidation(profile, monday), f = cons ? 0.75 : 1;
+    var lv = LEVELS[Math.max(1, Math.min(state.level, MAX_LEVEL) - (cons ? 1 : 0)) - 1], d = function (n) { return addDays(monday, n); };
+    var cad = Math.max(20, r5(lv.run * 0.6 * f));
+    var consNote = cons ? "Semaine de consolidation : volume réduit, pas de montée de palier. " : "";
     var out = [
-      sess(d(1), "palier", lv.title, lv.blocks, { level: lv.n, phase: PHASES[lv.phase], note: [lv.note, CADENCE].filter(Boolean).join(" "), key: true }),
+      sess(d(1), "palier", lv.title, lv.blocks, { level: lv.n, phase: PHASES[lv.phase], note: consNote + [lv.note, CADENCE].filter(Boolean).join(" "), key: true, consolidation: cons }),
       sess(d(3), "cadence", "Footing cadence", [W5, { k: "course", min: Math.max(10, cad - 9) , label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: "Pas plus vite : seulement des pas plus courts et plus rapides." }),
-      sess(d(4), "velo", "Vélo ou elliptique", bike(clamp(45 + 5 * (lv.n - 6), 40, 90)), { note: "Endurance sans impact pour le tibia." }),
-      sess(d(5), "rando", "Rando-course", rando(clamp(60 + 6 * lv.n, 60, 150), Math.min(25, Math.round(lv.run * 0.3))), { note: "Terrain souple. Montées raides et descentes en marchant." }),
+      sess(d(4), "velo", "Vélo ou elliptique", bike(clamp(45 + 5 * (lv.n - 8), 40, 90) * f), { note: "Endurance sans impact pour le tibia." }),
+      sess(d(5), "rando", "Rando-course", rando(clamp(50 + 5 * lv.n, 60, 150) * f, Math.min(25, Math.round(lv.run * 0.3))), { note: "Terrain souple. Montées raides et descentes en marchant." }),
     ];
     return out;
   }
@@ -271,15 +281,15 @@
     var monday = mondayOf(today), out = [];
     var level = Math.min(state.level, MAX_LEVEL + 1), streak = state.streak;
     var switchDate = state.mode === "ultra" ? (state.ultraStart || profile.switchDate) : null, passWeeks = 0;
-    var prog = null, perWeek = profile.rythme === "dynamique" ? 2 : 1, baseDate = state.mode === "ultra" || state.level >= 11 ? monday : null;
+    var prog = null, perWeek = profile.rythme === "dynamique" ? 2 : 1, baseDate = state.mode === "ultra" || state.level >= RELIEF_LEVEL ? monday : null;
     for (var i = 0; i < nWeeks; i++) {
       var m = addDays(monday, i * 7), w = { monday: m, sessions: [] };
       if (!switchDate) {
         if (level <= MAX_LEVEL) {
-          w.mode = "reprise"; w.level = level;
+          w.mode = "reprise"; w.level = level; w.consolidation = isConsolidation(profile, m);
           w.sessions = repriseWeek(profile, { level: level }, m);
-          if (!baseDate && level >= 11) baseDate = m;
-          if (i > 0 || weekday(today) <= 1) { streak += perWeek; while (streak >= 2) { level++; streak -= 2; } }
+          if (!baseDate && level >= RELIEF_LEVEL) baseDate = m;
+          if ((i > 0 || weekday(today) <= 1) && !w.consolidation) { streak += perWeek; while (streak >= 2) { level++; streak -= 2; } }
         } else if (passWeeks < 3) {
           w.mode = "passage"; w.level = MAX_LEVEL; passWeeks++;
           w.sessions = repriseWeek(profile, { level: MAX_LEVEL }, m);
@@ -299,7 +309,7 @@
       w.runMinutes = w.sessions.filter(function (x) { return x.kind !== "velo"; }).reduce(function (t, x) { return t + totalMin(x.blocks); }, 0);
       out.push(w);
     }
-    // baseDate : semaine où la reprise atteint le relief (palier 11, ≈ 5 h/semaine avec vélo et rando),
+    // baseDate : semaine où la reprise atteint le relief (palier 13, ≈ 5 h/semaine avec vélo et rando),
     // à partir de laquelle le rythme dynamique compte la préparation
     return { weeks: out, switchDate: switchDate, baseDate: baseDate };
   }
@@ -343,7 +353,7 @@
     return projection(profile, state, today, null, 80).switchDate || addDays(today, 560);
   }
 
-  var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, PHASES: PHASES, verdict: verdict, computeState: computeState, passage: passage,
+  var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, LADDER_V1: LADDER_V1, isConsolidation: isConsolidation, PHASES: PHASES, verdict: verdict, computeState: computeState, passage: passage,
     repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, weekSessions: weekSessions,
     totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal, prepStart: prepStart,
     addDays: addDays, diffDays: diffDays, todayStr: todayStr, longDate: longDate, monthYear: monthYear, mondayOf: mondayOf, weekday: weekday };
