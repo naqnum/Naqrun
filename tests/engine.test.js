@@ -135,4 +135,7 @@ const pb = E.buildProgram({ ...prof, switchDate: '2027-02-15' }, E.computeState(
 assert.ok(pb.weeks.some(w => w.block === 'Développement') && pb.weeks[0].block === 'Endurance fondamentale');
 assert.ok(pb.weeks.some(w => w.sessions.some(x => /avec rappel/.test(x.title))));
 assert.ok(!/\d/.test(E.intervalsText(pb.weeks[0].sessions[0].blocks).replace(/\d+m|\d+s|Z\d|\d+x/g, '')));
+// FC non confirmée : le temps au-dessus de l'endurance ne bloque pas ; confirmée : oui
+assert.equal(E.quality({ kind: 'palier', hiShare: 0.5 }).length, 0);
+assert.equal(E.quality({ kind: 'palier', hiShare: 0.5, hrTrusted: true }).length, 1);
 console.log('OK');

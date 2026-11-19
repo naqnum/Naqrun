@@ -82,7 +82,8 @@
   function quality(log) {
     var r = [];
     if (EASY[log.kind] && log.rpe != null && log.rpe >= 6) r.push("effort ressenti " + log.rpe + "/10 sur une séance facile");
-    if (EASY[log.kind] && log.hiShare != null && log.hiShare > 0.2) r.push(Math.round(log.hiShare * 100) + " % du temps au-dessus de la zone 2");
+    // la FC ne compte que si tes zones sont confirmées (réglages) ; sinon l'effort ressenti fait foi
+    if (log.hrTrusted && EASY[log.kind] && log.hiShare != null && log.hiShare > 0.2) r.push(Math.round(log.hiShare * 100) + " % du temps au-dessus de l'endurance");
     if (log.plannedMin && log.actualMin && log.actualMin > log.plannedMin * 1.1) r.push("séance plus longue que prévu (" + log.actualMin + " min au lieu de " + log.plannedMin + ")");
     return r;
   }

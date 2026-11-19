@@ -169,7 +169,8 @@ function stepsHtml(blocks) {
   function one(st) {
     var kind = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : st.k === "velo" ? "Vélo" : "Course";
     var z = DB.profile.hr || { z1: [129, 153], z2: [153, 166] };
-    var zone = st.k === "marche" ? "" : st.k === "cote" ? " · FC " + z.z2[0] + "–" + z.z2[1] : " · FC " + z.z1[0] + "–" + z.z1[1] + " (endurance)";
+    var tr = DB.profile.hrTrusted;
+    var zone = st.k === "marche" ? "" : st.k === "cote" ? " · un cran au-dessus" + (tr ? " (FC " + z.z2[0] + "–" + z.z2[1] + ")" : "") : " · aisance respiratoire" + (tr ? " (FC " + z.z1[0] + "–" + z.z1[1] + ")" : " (FC indicative ≈ " + z.z1[0] + "–" + z.z1[1] + ")");
     return '<li><i class="' + st.k + '" aria-hidden="true"></i><div><div class="t">' + esc(st.label || kind) + '</div><div class="d">' + hm(st.min < 1 ? 0 : st.min) .replace(/^0 min$/, Math.round(st.min * 60) + " s") + zone + "</div></div></li>";
   }
   return '<ul class="steps">' + blocks.map(function (b) {
@@ -341,7 +342,7 @@ function vJournal() {
     '<button class="small" data-act="fetchact"' + (ivReady() ? "" : " disabled") + ">Récupérer la sortie depuis Intervals.icu</button>" +
     (UI.msg.act ? '<div class="notice ' + UI.msg.act.t + '">' + esc(UI.msg.act.m) + "</div>" : "") +
     (d.activity ? '<div class="grid4">' + stat(d.activity.km, "km") + stat(d.activity.time, "durée") + stat(d.activity.hr || "—", "FC moy.") + stat(d.activity.cad || "—", "cadence") + "</div>" + (d.activity.cad && d.activity.cad < 165 ? '<div class="notice">Cadence sous 165 pas/min : vise des pas plus courts et plus rapides.</div>' : "") +
-      (d.activity.hiShare != null ? '<p class="muted">Temps au-dessus de la zone 2 : ' + Math.round(d.activity.hiShare * 100) + " %" + (d.activity.decoupling != null ? " · dérive cardiaque : " + num(d.activity.decoupling) + " %" : "") + "</p>" : "") +
+      (d.activity.hiShare != null ? '<p class="muted">Temps au-dessus de l\'endurance' + (DB.profile.hrTrusted ? "" : " (indicatif, zones à confirmer)") + " : " + Math.round(d.activity.hiShare * 100) + " %" + (d.activity.decoupling != null ? " · dérive cardiaque : " + num(d.activity.decoupling) + " %" : "") + "</p>" : "") +
       (d.activity.decoupling != null && d.activity.decoupling > 5 ? '<div class="notice">Dérive cardiaque au-dessus de 5 % : ton cœur a dû monter en fin de séance. Reste en bas de zone 2 la prochaine fois.</div>' : "") : "") +
     "</section>";
   h += '<section class="card"><h2>Effort ressenti</h2><label class="field"><span class="row">De 0 (repos) à 10 (maximal) <span class="val" id="o-rpe">' + (d.rpe == null ? "—" : d.rpe + "/10") + '</span></span><input type="range" min="0" max="10" value="' + (d.rpe == null ? 3 : d.rpe) + '" data-pain="rpe"></label><p class="muted">Une séance facile devrait rester entre 2 et 4. À 6 ou plus, elle ne fait pas monter de palier.</p></section>';
@@ -487,7 +488,7 @@ function vSettings() {
   h += '<section class="card"><h2>Reprise</h2><label class="field">Palier de départ<select id="startLevel">' + E.LEVELS.map(function (lv) { return '<option value="' + lv.n + '"' + (lv.n === p.startLevel ? " selected" : "") + ">" + lv.n + " · " + esc(lv.title) + "</option>"; }).join("") + "</select></label>" + (p.switchDate ? '<button class="small" data-act="unswitch">Revenir en mode reprise</button>' : "") + "</section>";
   if (S().mode === "ultra") h += '<section class="card"><h2>Programme ultra</h2><label class="field">Heures maximum par semaine<input type="number" id="hoursMax" min="5" max="16" step="0.5" value="' + p.hoursMax + '"></label><p class="muted">Le temps d\'entraînement que tu peux consacrer au pic de ta préparation (course, rando et vélo compris). Le programme monte progressivement jusqu\'à ce plafond sans jamais le dépasser, même si la course en demanderait plus.</p></section>';
   var hr = p.hr || DEFAULT.profile.hr;
-  h += '<section class="card"><h2>Zones de fréquence cardiaque</h2><p class="muted">Reprises de tes zones Nolio (FC max 192, SV1 150, SV2 175). Endurance = sous le premier seuil. Mets les mêmes zones dans Intervals.icu pour que la montre t\'alerte au bon moment.</p><div class="btns"><label class="field">Endurance min<input type="number" inputmode="numeric" data-hr="z1.0" value="' + hr.z1[0] + '"></label><label class="field">Endurance max<input type="number" inputmode="numeric" data-hr="z1.1" value="' + hr.z1[1] + '"></label></div><div class="btns"><label class="field">Tempo min<input type="number" inputmode="numeric" data-hr="z2.0" value="' + hr.z2[0] + '"></label><label class="field">Tempo max<input type="number" inputmode="numeric" data-hr="z2.1" value="' + hr.z2[1] + '"></label></div></section>';
+  h += '<section class="card"><h2>Zones de fréquence cardiaque</h2><p class="muted">Reprises de tes zones Nolio (FC max 192, SV1 150, SV2 175), mais à confirmer. Tant qu\'elles ne le sont pas, c\'est l\'aisance respiratoire qui guide tes footings : tu dois pouvoir parler en phrases complètes (effort ressenti 2 à 4 sur 10). La FC reste affichée à titre indicatif et ne bloque pas ta progression.</p><label class="check"><input type="checkbox" id="hrTrusted"' + (p.hrTrusted ? " checked" : "") + '>Mes zones sont confirmées (la FC compte dans l\'algorithme)</label><div class="btns"><label class="field">Endurance min<input type="number" inputmode="numeric" data-hr="z1.0" value="' + hr.z1[0] + '"></label><label class="field">Endurance max<input type="number" inputmode="numeric" data-hr="z1.1" value="' + hr.z1[1] + '"></label></div><div class="btns"><label class="field">Tempo min<input type="number" inputmode="numeric" data-hr="z2.0" value="' + hr.z2[0] + '"></label><label class="field">Tempo max<input type="number" inputmode="numeric" data-hr="z2.1" value="' + hr.z2[1] + '"></label></div></section>';
   h += '<section class="card"><h2>Estimation des durées</h2>' +
     '<p class="muted">Course de référence pour estimer tes temps de course (par défaut ton trail de Fermanville sur Strava).</p><div class="btns"><label class="field">km<input type="number" inputmode="decimal" id="refKm" value="' + p.ref.km + '"></label><label class="field">D+ (m)<input type="number" inputmode="numeric" id="refDp" value="' + p.ref.dplus + '"></label><label class="field">Durée (h)<input type="number" inputmode="decimal" step="0.05" id="refH" value="' + p.ref.hours + '"></label></div></section>';
   h += '<section class="card"><h2>Sauvegarde</h2><p class="muted">Tes données sont sur ce téléphone. Copie la sauvegarde de temps en temps (dans Notes, par exemple).</p><div class="btns"><button class="small" data-act="export">Copier la sauvegarde</button><button class="small" data-act="import">Coller une sauvegarde</button></div>' + (UI.msg.bk ? '<div class="notice ' + UI.msg.bk.t + '">' + esc(UI.msg.bk.m) + "</div>" : "") + (UI.showImport ? '<textarea id="bkText" placeholder="Colle ta sauvegarde ici"></textarea><button class="small" data-act="doimport">Importer</button>' : "") + "</section>";
@@ -539,7 +540,7 @@ document.addEventListener("click", function (ev) {
   if (a === "savelog") {
     readDraft(); var d = UI.draft;
     if (!d.date || d.date > t) { alert("Choisis une date passée ou aujourd'hui."); return; }
-    DB.logs.push(Object.assign({}, d, { id: String(Date.now()), title: d.title || KINDS[d.kind] })); save(); UI.draft = null; UI.msg.act = null;
+    DB.logs.push(Object.assign({}, d, { id: String(Date.now()), title: d.title || KINDS[d.kind], hrTrusted: !!p.hrTrusted })); save(); UI.draft = null; UI.msg.act = null;
     return go("today");
   }
   if (a === "fetchact") {
@@ -617,6 +618,7 @@ document.addEventListener("change", function (ev) {
   if (t.dataset.gate) { p.gates[t.dataset.gate] = t.checked; save(); return render(); }
   if (t.dataset.race) { readRace(); var s2 = S(), box = document.getElementById("raceAnalysis"); if (box) box.innerHTML = raceAnalysis(UI.raceDraft, s2, E.prepStart(DB.profile, s2, today())); return; }
   if (t.dataset.hr) { var k2 = t.dataset.hr.split("."); p.hr = p.hr || JSON.parse(JSON.stringify(DEFAULT.profile.hr)); if (+t.value > 60) { p.hr[k2[0]][+k2[1]] = +t.value; save(); } return; }
+  if (t.id === "hrTrusted") { p.hrTrusted = t.checked; save(); return render(); }
   if (t.id === "startLevel") { p.startLevel = +t.value; save(); return; }
   if (t.id === "hoursMax") { p.hoursMax = Math.max(5, Math.min(16, +t.value || 10)); save(); return; }
   if (t.id === "refKm" || t.id === "refDp" || t.id === "refH") { var k = { refKm: "km", refDp: "dplus", refH: "hours" }[t.id]; if (+t.value > 0) { p.ref[k] = +t.value; save(); } return; }
