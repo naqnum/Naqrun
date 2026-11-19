@@ -2,10 +2,11 @@
 
 Appli iPhone (page web installable) pour reprendre la course après une périostite tibiale, puis préparer le Raid de l'Archange (280 km, juin 2027).
 
-- **Mode reprise** : 15 paliers, du course/marche au trail de 90 min. Après chaque séance, trois notes de douleur (pendant, après, lendemain matin) donnent un verdict vert, orange ou rouge qui fait monter, rester ou reculer d'un palier. Trois signes d'arrêt (douleur précise sur l'os, douleur au repos, boiterie) bloquent la course.
-- **Test de passage** : paliers terminés, 3 semaines au vert, test de sauts, feu vert médical facultatif.
-- **Plan Raid** : semaines Base, Construction, Pic, Affûtage calculées à rebours depuis la date du Raid, avec semaines allégées et points de décision (mi-février, fin mars, fin avril, fin mai).
-- **Envoi sur la montre** : chaque séance est envoyée à Intervals.icu, qui la transmet à Garmin Connect, puis à la Fenix.
+- **Reprise (périostite)** : 15 paliers, du course/marche au trail de 90 min, dans une semaine type : footing palier (seule séance qui fait progresser), footing cadence, vélo ou elliptique, rando-course. Trois notes de douleur par course (pendant, après, lendemain matin) donnent un verdict vert, orange ou rouge. Trois signes d'arrêt bloquent la course. Relief : pentes douces courues, montées raides et descentes marchées.
+- **Test de passage** : paliers terminés, 3 semaines au vert, 15 sauts sur une jambe et 25 montées sur pointe sans douleur, feu vert médical facultatif.
+- **Programme ultra-trail (finisher)** : fiche course (distance, D+, étapes, temps limite, terrain, autonomie, nuit), km-effort, durée estimée et marge sur le temps limite, faisabilité selon les semaines disponibles, plan Base › Construction › Spécifique › Affûtage avec semaines allégées, week-ends chocs ou blocs de 3 jours, points de décision. Séances structurées en temps et zones de FC, pas d'objectif d'allure.
+- **Projection** : les semaines et mois à venir, en supposant toutes les séances vertes.
+- **Envoi sur la montre** : chaque séance part sur Intervals.icu, qui la transmet à Garmin Connect, puis à la Fenix.
 
 ## Installer sur l'iPhone
 

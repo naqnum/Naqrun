@@ -7,4 +7,6 @@
 - Données dans `localStorage` (`naqrun.v1`) ; ne jamais committer de clé API ni de données personnelles.
 - Envoi montre : API Intervals.icu (`POST /api/v1/athlete/{id}/events`, auth Basic `API_KEY:<clé>`), description au format texte Intervals (`- 40m Z2 HR`). Pas de chiffres dans les libellés d'étapes (ils perturbent l'analyse d'Intervals).
 - Après un changement de fichier mis en cache, incrémenter `CACHE` dans `sw.js`.
+- Séances toujours structurées en temps et zones de FC (jamais en distance ni en allure). Objectif unique : être finisher.
+- Pas de séances de renfo dans le programme (demande de l'utilisateur).
 - Ne pas affaiblir les règles de sécurité douleur (signes d'arrêt, recul sur rouge) sans demande explicite.

@@ -1,5 +1,7 @@
-/* Moteur de l'appli Reprise & Raid — logique pure, sans interface.
-   Toutes les dates sont des chaînes locales "AAAA-MM-JJ". */
+/* NaqRun — moteur (logique pure, sans interface).
+   Dates : chaînes locales "AAAA-MM-JJ".
+   Phase 1 : reprise de charge guidée par la douleur (périostite).
+   Phase 2 : programme ultra-trail orienté « finisher ». */
 (function (root) {
   "use strict";
 
@@ -15,11 +17,14 @@
   var JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
   function longDate(d) { var x = new Date(parse(d)); return JOURS[weekday(d)] + " " + x.getUTCDate() + " " + MOIS[x.getUTCMonth()]; }
   function monthYear(d) { var x = new Date(parse(d)); return MOIS[x.getUTCMonth()] + " " + x.getUTCFullYear(); }
+  function r5(x) { return Math.max(5, Math.round(x / 5) * 5); }
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 
   // ---------- Paliers de reprise ----------
-  // Chaque bloc : {k:"marche"|"course"|"cote", min, label?} ou {rep:n, steps:[...]}
+  // Bloc : {k:"marche"|"course"|"cote"|"velo", min, label?} ou {rep:n, steps:[...]}
   var W5 = { k: "marche", min: 5, label: "Échauffement" }, C5 = { k: "marche", min: 5, label: "Retour au calme" };
-  function cont(min) { return [W5, { k: "course", min: min, label: "Course facile" }, C5]; }
+  function cont(min, label) { return [W5, { k: "course", min: min, label: label || "Course facile" }, C5]; }
+  var RELIEF = "Pentes douces seulement (moins de 6 %). Montées raides et descentes : en marchant.";
   var LEVELS = [
     { n: 1, phase: 0, title: "6 × (3 min course / 1 min marche)", run: 18, blocks: [W5, { rep: 6, steps: [{ k: "course", min: 3 }, { k: "marche", min: 1 }] }, C5] },
     { n: 2, phase: 0, title: "5 × (5 min course / 1 min marche)", run: 25, blocks: [W5, { rep: 5, steps: [{ k: "course", min: 5 }, { k: "marche", min: 1 }] }, C5] },
@@ -31,54 +36,57 @@
     { n: 8, phase: 2, title: "50 min continu", run: 50, blocks: cont(50) },
     { n: 9, phase: 2, title: "55 min continu", run: 55, blocks: cont(55) },
     { n: 10, phase: 2, title: "60 min continu", run: 60, blocks: cont(60) },
-    { n: 11, phase: 3, title: "50 min avec 6 montées courues", run: 50, blocks: [W5, { k: "course", min: 15, label: "Course facile" }, { rep: 6, steps: [{ k: "cote", min: 1, label: "Montée courue, facile" }, { k: "marche", min: 2, label: "Descente marchée" }] }, { k: "course", min: 17, label: "Course facile" }, C5] },
-    { n: 12, phase: 3, title: "60 min avec 8 montées courues", run: 60, blocks: [W5, { k: "course", min: 15, label: "Course facile" }, { rep: 8, steps: [{ k: "cote", min: 1.5, label: "Montée courue, facile" }, { k: "marche", min: 2, label: "Descente marchée" }] }, { k: "course", min: 17, label: "Course facile" }, C5] },
-    { n: 13, phase: 4, title: "Trail 70 min", run: 70, blocks: [W5, { k: "course", min: 70, label: "Trail facile, descentes prudentes" }, C5] },
-    { n: 14, phase: 4, title: "Trail 80 min", run: 80, blocks: [W5, { k: "course", min: 80, label: "Trail facile, descentes courues" }, C5] },
-    { n: 15, phase: 4, title: "Trail 90 min", run: 90, blocks: [W5, { k: "course", min: 90, label: "Trail facile, descentes courues" }, C5] },
+    { n: 11, phase: 3, title: "50 min vallonné doux", run: 50, blocks: cont(50, "Course facile, vallonné doux"), note: RELIEF },
+    { n: 12, phase: 3, title: "60 min vallonné doux", run: 60, blocks: cont(60, "Course facile, vallonné doux"), note: RELIEF },
+    { n: 13, phase: 4, title: "Trail 70 min", run: 70, blocks: cont(70, "Trail facile"), note: "Montées raides marchées, descentes marchées." },
+    { n: 14, phase: 4, title: "Trail 80 min", run: 80, blocks: cont(80, "Trail facile"), note: "Montées raides marchées, descentes douces courues." },
+    { n: 15, phase: 4, title: "Trail 90 min", run: 90, blocks: cont(90, "Trail facile"), note: "Montées raides marchées, descentes courues sans freiner fort." },
   ];
-  var MAX_LEVEL = LEVELS.length; // 15 ; level 16 = reprise terminée
+  var MAX_LEVEL = LEVELS.length;
   var PHASES = ["Repli course/marche", "Continu sur le plat", "Volume", "Relief doux", "Trail"];
+  var CADENCE = "Cadence visée : 165 à 170 pas/min (alerte cadence sur la Fenix).";
 
-  // ---------- Verdict d'une séance ----------
-  // log : {date, during, after, morning|null, increasing, flags:[bool,bool,bool]}
+  // ---------- Verdict d'une séance de course ----------
+  // Seuils périostite : vert ≤ 3/10 pendant et après, rien le lendemain.
   function verdict(log) {
     if (log.flags && log.flags.some(Boolean)) return "stop";
     var m = log.morning;
     if (log.during >= 6 || log.after >= 6 || log.increasing || (m != null && m >= 4)) return "rouge";
-    if (log.during >= 4 || log.after >= 4 || (m != null && m >= 2 && m > (log.baseline || 0))) return "orange";
+    if (log.during >= 4 || log.after >= 4 || (m != null && m >= 2)) return "orange";
     return "vert";
   }
 
   // ---------- Rejouer l'historique ----------
-  // profile : {startLevel, switchDate|null, raceDate, peakHours, gates:{}, hop, kine}
   function computeState(profile, logs, today) {
-    var s = { mode: "reprise", level: profile.startLevel || 6, streak: 0, stopped: false, lastDate: null, lastVerdict: null, restDays: 0, ultraStart: null, ultraReduce: {}, events: [] };
+    var s = { mode: "reprise", level: profile.startLevel || 6, streak: 0, stopped: false, lastDate: null, lastVerdict: null, restUntil: null, ultraStart: null, reduce: {}, events: [], returned: false };
     var sorted = (logs || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     sorted.forEach(function (log) {
       var v = verdict(log);
       log._v = v; log._provisional = log.morning == null;
       s.lastDate = log.date; s.lastVerdict = v;
-      if (profile.switchDate && s.mode === "reprise" && log.date >= profile.switchDate && !s._returned) { s.mode = "ultra"; s.ultraStart = profile.switchDate; }
-      if (v === "stop") { s.stopped = !(profile.clearedStop && profile.clearedStop >= log.date); s.level = Math.max(1, Math.min(s.level, MAX_LEVEL) - 2); s.streak = 0; s.restDays = 3; if (s.mode === "ultra") { s.mode = "reprise"; s._returned = true; s.level = 10; } s.events.push({ date: log.date, t: "Signe d'arrêt" }); return; }
-      if (s.mode === "ultra") {
-        if (v === "rouge") { s.mode = "reprise"; s._returned = true; s.level = 10; s.streak = 0; s.restDays = 3; s.events.push({ date: log.date, t: "Rouge : retour en reprise (60 min continu)" }); }
-        else if (v === "orange") { s.ultraReduce[addDays(mondayOf(log.date), 7)] = true; s.restDays = 2; }
-        else { s.restDays = 2; }
-        return;
+      if (profile.switchDate && s.mode === "reprise" && !s.returned && log.date >= profile.switchDate) { s.mode = "ultra"; s.ultraStart = profile.switchDate; }
+      if (v === "stop") {
+        s.stopped = !(profile.clearedStop && profile.clearedStop >= log.date);
+        if (s.mode === "ultra") { s.mode = "reprise"; s.returned = true; s.level = 10; } else s.level = Math.max(1, Math.min(s.level, MAX_LEVEL) - 2);
+        s.streak = 0; s.restUntil = addDays(log.date, 2); s.events.push({ date: log.date, t: "Signe d'arrêt" }); return;
       }
-      if (v === "vert") { s.streak++; if (s.streak >= 2 && s.level <= MAX_LEVEL) { s.level++; s.streak = 0; s.events.push({ date: log.date, t: "Palier suivant" }); } s.restDays = 2; }
-      else if (v === "orange") { s.streak = 0; s.restDays = 2; }
-      else { s.level = Math.max(1, Math.min(s.level, MAX_LEVEL) - 2); s.streak = 0; s.restDays = 3; s.events.push({ date: log.date, t: "Rouge : recul de 2 paliers" }); }
+      if (v === "rouge") {
+        if (s.mode === "ultra") { s.mode = "reprise"; s.returned = true; s.level = 10; s.events.push({ date: log.date, t: "Rouge : retour en reprise (60 min continu)" }); }
+        else { s.level = Math.max(1, Math.min(s.level, MAX_LEVEL) - 2); s.events.push({ date: log.date, t: "Rouge : recul de 2 paliers" }); }
+        s.streak = 0; s.restUntil = addDays(log.date, 2); return;
+      }
+      if (s.mode === "ultra") { if (v === "orange") s.reduce[addDays(mondayOf(log.date), 7)] = true; return; }
+      if (v === "orange") { s.streak = 0; return; }
+      // vert : seules les séances « palier » font monter
+      if (log.kind === "palier" || log.kind == null) {
+        s.streak++;
+        if (s.streak >= 2 && s.level <= MAX_LEVEL) { s.level++; s.streak = 0; s.events.push({ date: log.date, t: "Palier suivant" }); }
+      }
     });
-    if (profile.switchDate && s.mode === "reprise" && !s._returned && today >= profile.switchDate) { s.mode = "ultra"; s.ultraStart = profile.switchDate; }
-    s.nextDate = s.lastDate ? addDays(s.lastDate, s.restDays) : today;
-    if (s.nextDate < today) s.nextDate = today;
-    // pas plus de 3 courses sur 7 jours glissants
-    var last7 = sorted.filter(function (l) { return diffDays(l.date, s.nextDate) < 7 && diffDays(l.date, s.nextDate) > 0; });
-    if (last7.length >= 3) { var third = last7[last7.length - 3].date; s.nextDate = addDays(third, 7); }
+    if (profile.switchDate && s.mode === "reprise" && !s.returned && today >= profile.switchDate) { s.mode = "ultra"; s.ultraStart = profile.switchDate; }
     s.logs = sorted;
     s.done = s.level > MAX_LEVEL;
+    s.resting = !!(s.restUntil && today <= s.restUntil);
     return s;
   }
 
@@ -89,95 +97,206 @@
     var items = [
       { k: "paliers", label: "Paliers validés jusqu'au trail de 90 min", ok: state.done, required: true },
       { k: "vert", label: "3 semaines au vert (6 séances ou plus)", ok: allGreen, required: true, detail: recent.length + " séance(s) sur 21 jours" },
-      { k: "hop", label: "20 à 30 sauts sur une jambe sans douleur, de chaque côté", ok: !!profile.hop, required: true, manual: true },
+      { k: "hop", label: "15 sauts sur une jambe sans douleur, de chaque côté", ok: !!profile.hop, required: true, manual: true },
+      { k: "heel", label: "25 montées sur une pointe de pied sans douleur, de chaque côté", ok: !!profile.heel, required: true, manual: true },
       { k: "kine", label: "Feu vert du kiné ou du médecin", ok: !!profile.kine, required: false, manual: true },
     ];
     return { items: items, ready: items.every(function (i) { return !i.required || i.ok; }) };
   }
 
-  // ---------- Plan ultra ----------
-  function buildPlan(profile, state) {
-    var start = mondayOf(state.ultraStart || profile.switchDate);
-    var race = profile.raceDate;
-    var weeks = Math.max(1, Math.ceil((diffDays(start, mondayOf(race)) + 1) / 7));
-    var peak = profile.peakHours || 10, h0 = 4.5;
-    var out = [], h = h0, buildIdx = 0;
-    for (var i = 0; i < weeks; i++) {
-      var left = weeks - i; // semaines restantes, course comprise
-      var block = left <= 3 ? "Affûtage" : left <= 6 ? "Pic" : left <= 12 ? "Construction" : "Base";
-      var hours, light = false;
-      if (block === "Affûtage") hours = peak * [0.3, 0.45, 0.6][left - 1];
-      else if (block === "Pic") hours = peak;
-      else {
-        buildIdx++;
-        if (buildIdx % 4 === 0) { hours = h * 0.7; light = true; }
-        else { h = Math.min(peak, i === 0 ? h0 : h * 1.1); hours = h; }
-      }
-      var monday = addDays(start, i * 7);
-      if (state.ultraReduce[monday]) { hours *= 0.7; light = true; }
-      out.push({ i: i + 1, monday: monday, block: block, hours: Math.round(hours * 2) / 2, light: light, sessions: weekSessions(block, hours, monday, race, left) });
-    }
+  // ---------- Séances types ----------
+  function sess(date, kind, title, blocks, extra) { return Object.assign({ date: date, kind: kind, title: title, blocks: blocks, sport: kind === "velo" ? "Ride" : kind === "renfo" ? null : "Run", note: "" }, extra || {}); }
+  function easy(min, label) { return [W5, { k: "course", min: Math.max(10, r5(min - 10)), label: label || "Course facile" }, C5]; }
+  function bike(min) { return [{ k: "velo", min: r5(min), label: "Vélo ou elliptique facile" }]; }
+  function rando(min, runMin) {
+    var walk = Math.max(20, r5((min - runMin) / 2));
+    return [{ k: "marche", min: walk, label: "Rando, montées marchées vite" }, { k: "course", min: r5(runMin), label: "Course facile sur portion plate" }, { k: "marche", min: walk, label: "Rando, descentes marchées" }];
+  }
+  function hikeRepeats(min, reps) {
+    var main = reps * 7;
+    return [{ k: "course", min: 15, label: "Échauffement en course facile" }, { rep: reps, steps: [{ k: "cote", min: 4, label: "Montée de la côte en marche rapide" }, { k: "marche", min: 3, label: "Descente marchée" }] }, { k: "course", min: Math.max(10, r5(min - 15 - main)), label: "Retour au calme" }];
+  }
+  function strides(min) { return [W5, { k: "course", min: Math.max(10, r5(min - 18)), label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, relâché" }, { k: "course", min: 1, label: "Course facile" }] }, C5]; }
+  function totalMin(blocks) {
+    return blocks.reduce(function (t, b) { return t + (b.rep ? b.rep * b.steps.reduce(function (u, st) { return u + st.min; }, 0) : b.min); }, 0);
+  }
+
+  // Semaine type de reprise : mardi palier, jeudi cadence, vendredi vélo, samedi rando-course
+  function repriseWeek(profile, state, monday) {
+    var lv = LEVELS[Math.min(state.level, MAX_LEVEL) - 1], d = function (n) { return addDays(monday, n); };
+    var cad = Math.max(20, r5(lv.run * 0.6));
+    var out = [
+      sess(d(1), "palier", lv.title, lv.blocks, { level: lv.n, phase: PHASES[lv.phase], note: [lv.note, CADENCE].filter(Boolean).join(" "), key: true }),
+      sess(d(3), "cadence", "Footing cadence", [W5, { k: "course", min: Math.max(10, cad - 9) , label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: "Pas plus vite : seulement des pas plus courts et plus rapides." }),
+      sess(d(4), "velo", "Vélo ou elliptique", bike(clamp(45 + 5 * (lv.n - 6), 40, 90)), { note: "Endurance sans impact pour le tibia." }),
+      sess(d(5), "rando", "Rando-course", rando(clamp(60 + 6 * lv.n, 60, 150), Math.min(25, Math.round(lv.run * 0.3))), { note: "Terrain souple. Montées raides et descentes en marchant." }),
+    ];
     return out;
   }
 
-  function sess(date, title, min, blocks, note) { return { date: date, title: title, min: Math.round(min / 5) * 5, blocks: blocks, note: note || "" }; }
-  function easy(min, label) { return [W5, { k: "course", min: Math.max(10, Math.round((min - 10) / 5) * 5), label: label || "Course facile" }, C5]; }
-  function hills(min, reps) {
-    var main = reps * 5;
-    return [{ k: "course", min: 15, label: "Échauffement en course facile" }, { rep: reps, steps: [{ k: "cote", min: 2, label: "Montée de la côte (80 m D+), effort soutenu" }, { k: "marche", min: 3, label: "Descente marchée" }] }, { k: "course", min: Math.max(10, Math.round(min - 15 - main)), label: "Retour au calme" }];
+  // ---------- Fiche course et estimations ----------
+  var PREP = [ // semaines recommandées selon le km-effort total
+    { max: 45, min: 12, max_: 16, label: "trail court à moyen" },
+    { max: 75, min: 20, max_: 24, label: "≈ 50 km trail" },
+    { max: 115, min: 28, max_: 36, label: "80 à 100 km" },
+    { max: 210, min: 36, max_: 44, label: "100 à 160 km" },
+    { max: 1e9, min: 40, max_: 52, label: "160 km et plus" },
+  ];
+  function analyseRace(race, ref, startDate) {
+    var stages = Math.max(1, race.stages || 1);
+    var kmE = race.km + race.dplus / 100;
+    var ratio = race.km ? race.dplus / race.km : 0;
+    var profil = ratio < 20 ? "roulant" : ratio <= 40 ? "vallonné" : "montagne";
+    var refKmE = ref.km + ref.dplus / 100, refSpeed = refKmE / ref.hours;
+    var stageKmE = kmE / stages;
+    var t = (stageKmE / refSpeed) * Math.pow(stageKmE / refKmE, 0.15);
+    if (race.terrain === "technique") t *= 1.1;
+    if (t > 6) t *= 1.1; // arrêts aux ravitaillements, sac, nuit
+    if (race.night) t *= 1.05;
+    var total = t * stages;
+    var prep = PREP.filter(function (p) { return kmE < p.max; })[0];
+    var weeks = startDate ? Math.floor(diffDays(mondayOf(startDate), race.date) / 7) : null;
+    var feas = weeks == null ? null : weeks >= prep.min ? "ok" : weeks >= Math.round(prep.min * 0.75) ? "tendu" : "insuffisant";
+    var margin = race.cutoffH ? race.cutoffH - total : null;
+    return { kmE: Math.round(kmE), ratio: Math.round(ratio), profil: profil, stageHours: t, totalHours: total, prep: prep, weeks: weeks, feas: feas, margin: margin, stages: stages };
   }
-  function weekSessions(block, hours, monday, race, left) {
-    var M = hours * 60, d = function (n) { return addDays(monday, n); }, s = [];
-    if (block === "Base") {
-      s.push(sess(d(1), "Footing", M * 0.18, easy(M * 0.18)));
-      s.push(sess(d(3), "Footing + 6 accélérations", M * 0.2, easy(M * 0.2, "Course facile, 6 × 20 s plus vite à la fin")));
-      s.push(sess(d(5), "Sortie longue", M * 0.37, easy(M * 0.37, "Sortie longue facile, terrain varié")));
-      s.push(sess(d(6), "Footing souple", M * 0.25, easy(M * 0.25)));
-    } else if (block === "Construction") {
-      var reps = Math.min(10, 5 + Math.floor(hours / 3));
-      s.push(sess(d(1), "Côtes répétées (" + reps + " ×)", M * 0.17, hills(M * 0.17, reps), "Sur ta côte de 80 m D+."));
-      s.push(sess(d(3), "Footing vallonné", M * 0.18, easy(M * 0.18, "Course facile, vallonné")));
-      s.push(sess(d(5), "Sortie longue avec sac", M * 0.35, easy(M * 0.35, "Sortie longue facile avec sac chargé"), "Teste ravitaillement et matériel."));
-      s.push(sess(d(6), "Sortie enchaînée", M * 0.3, easy(M * 0.3, "Course facile sur jambes fatiguées")));
-    } else if (block === "Pic") {
-      s.push(sess(d(1), "Côtes répétées (6 ×)", M * 0.12, hills(M * 0.12, 6)));
-      if (left === 5) {
-        s.push(sess(d(4), "Bloc 3 jours — jour 1 (≈ 35 km)", 240, easy(240, "Course/marche active, allure Raid"), "Point de décision fin mai."));
-        s.push(sess(d(5), "Bloc 3 jours — jour 2 (≈ 30 km)", 210, easy(210, "Course/marche active, allure Raid")));
-        s.push(sess(d(6), "Bloc 3 jours — jour 3 (≈ 25 km)", 180, easy(180, "Course/marche active, allure Raid")));
-      } else {
-        s.push(sess(d(3), "Footing", M * 0.13, easy(M * 0.13)));
-        s.push(sess(d(5), "Sortie longue (nuit possible)", M * 0.4, easy(M * 0.4, "Sortie longue facile, sac complet"), "Une de ces sorties de nuit, frontale."));
-        s.push(sess(d(6), "Sortie enchaînée", M * 0.35, easy(M * 0.35, "Course facile sur jambes fatiguées")));
+
+  // ---------- Programme ultra ----------
+  function buildProgram(profile, state, race) {
+    var start = mondayOf(state.ultraStart || profile.switchDate);
+    var an = analyseRace(race, profile.ref, start);
+    var weeks = Math.max(1, Math.ceil((diffDays(start, mondayOf(race.date)) + 1) / 7));
+    var catPeak = an.kmE < 75 ? 7 : an.kmE < 115 ? 9 : an.kmE < 210 ? 11 : 12;
+    var peak = Math.min(profile.hoursMax || 10, catPeak);
+    var taper = an.kmE < 115 ? 2 : 3;
+    var spec = Math.min(5, Math.max(0, weeks - taper - 2));
+    var constr = Math.min(8, Math.max(0, weeks - taper - spec - 1));
+    var longPeak = an.stages > 1 ? clamp(an.stageHours * 0.5, 2.5, 5) : clamp(an.totalHours * 0.4, 2.5, 6);
+    var dplusPeak = clamp(Math.round(race.dplus / an.stages * 1.0 / 100) * 100, 500, 5000);
+    if (an.stages === 1) dplusPeak = clamp(Math.round(race.dplus * 0.75 / 100) * 100, 500, 5000);
+    var h0 = profile.h0 || 4.5, h = h0, buildIdx = 0, out = [];
+    var taperStart = weeks - taper;
+    var chocs = {}; // index de semaine (0-based) -> true
+    [taperStart - 2, taperStart - 5, taperStart - 9].forEach(function (i) { if (i >= 1 && i < taperStart) chocs[i] = true; });
+    var prepRace = an.kmE >= 75 && taperStart - 7 >= 2 ? taperStart - 7 : null;
+    for (var i = 0; i < weeks; i++) {
+      var block = i >= taperStart ? "Affûtage" : i >= taperStart - spec ? "Spécifique" : i >= taperStart - spec - constr ? "Construction" : "Base";
+      var hours, light = false;
+      if (block === "Affûtage") { var k = i - taperStart; hours = peak * (taper === 3 ? [0.8, 0.6, 0.4] : [0.55, 0.4])[k]; }
+      else {
+        buildIdx++;
+        if (buildIdx % 4 === 0 && !chocs[i]) { hours = h * 0.7; light = true; }
+        else { h = Math.min(peak, i === 0 ? h0 : h * 1.1); hours = h; }
       }
+      var monday = addDays(start, i * 7);
+      if (state.reduce[monday]) { hours *= 0.7; light = true; }
+      var frac = hours / peak;
+      var w = { i: i + 1, monday: monday, block: block, hours: Math.round(hours * 2) / 2, light: light, choc: !!chocs[i], prepRace: prepRace === i,
+        dplus: block === "Affûtage" ? Math.round(dplusPeak * frac * 0.6 / 50) * 50 : Math.round(dplusPeak * frac / 50) * 50 };
+      w.sessions = ultraWeek(w, race, an, longPeak, weeks - i, hours);
+      out.push(w);
+    }
+    return { weeks: out, analysis: an, peak: peak, longPeak: longPeak, dplusPeak: dplusPeak, taper: taper, gates: gates(out, an, longPeak) };
+  }
+
+  function ultraWeek(w, race, an, longPeak, left, hours) {
+    var M = hours * 60, d = function (n) { return addDays(w.monday, n); }, s = [];
+    var longMin = Math.min(longPeak * 60, M * 0.35);
+    if (w.block === "Affûtage") {
+      if (left === 1) s.push(sess(d(1), "footing", "Footing + 4 accélérations", strides(30)));
+      else {
+        s.push(sess(d(1), "footing", "Footing + 6 accélérations", strides(M * 0.25)));
+        s.push(sess(d(3), "rando", "Rando-course courte", rando(M * 0.25, 20)));
+        s.push(sess(d(5), "longue", "Sortie moyenne", easy(M * 0.4, "Course facile, terrain de la course")));
+      }
+      return s.filter(function (x) { return x.date < race.date; });
+    }
+    s.push(sess(d(1), "footing", w.block === "Base" ? "Footing + 6 accélérations" : "Footing", w.block === "Base" ? strides(M * 0.14) : easy(M * 0.12), { note: CADENCE }));
+    if (w.block === "Base") s.push(sess(d(3), "rando", "Rando-course avec D+", rando(M * 0.2, 20)));
+    else s.push(sess(d(3), "cote", "Montées marchées sur la côte (" + Math.min(10, 4 + Math.floor(hours / 2)) + " ×)", hikeRepeats(M * 0.16, Math.min(10, 4 + Math.floor(hours / 2))), { note: "Marche rapide en montée, bâtons si tu cours avec. Faible impact pour le tibia." }));
+    s.push(sess(d(4), "velo", "Vélo ou elliptique", bike(clamp(M * 0.12, 40, 120))));
+    if (w.choc && an.stages > 1) {
+      var dd = r5(Math.min(longPeak * 60, an.stageHours * 60 * 0.5));
+      s = s.filter(function (x) { return x.date !== d(4); });
+      s.push(sess(d(4), "longue", "Bloc 3 jours — jour 1", easy(dd, "Course et marche, sac de course"), { note: "Simulation des étapes : sac, ravitaillement, matériel." }));
+      s.push(sess(d(5), "longue", "Bloc 3 jours — jour 2", easy(dd * 0.85, "Course et marche, sac de course")));
+      s.push(sess(d(6), "longue", "Bloc 3 jours — jour 3", easy(dd * 0.7, "Course et marche, sac de course")));
+    } else if (w.choc) {
+      s = s.filter(function (x) { return x.kind !== "velo"; });
+      s.push(sess(d(5), "longue", "Week-end choc — jour 1", easy(longPeak * 60, "Course et marche, sac complet"), { note: "Teste nutrition et matériel." }));
+      s.push(sess(d(6), "longue", "Week-end choc — jour 2", easy(longPeak * 60 * 0.6, "Course et marche sur jambes fatiguées")));
     } else {
-      if (left === 1) {
-        s.push(sess(d(1), "Footing + 4 accélérations", 30, easy(30, "Course facile, 4 × 20 s plus vite")));
-      } else {
-        s.push(sess(d(1), "Footing + 6 accélérations", M * 0.25, easy(M * 0.25, "Course facile, 6 × 20 s plus vite")));
-        s.push(sess(d(3), "Footing", M * 0.25, easy(M * 0.25)));
-        s.push(sess(d(5), "Sortie moyenne", M * 0.4, easy(M * 0.4, "Course facile, terrain du Raid")));
-      }
+      s.push(sess(d(5), "longue", w.block === "Base" ? "Sortie longue" : "Sortie longue avec sac", easy(longMin, "Course facile, montées raides marchées"), { note: w.prepRace ? "Semaine idéale pour une course de préparation : ≈ " + Math.round(race.km / 2) + " km et " + Math.round(race.dplus / 2) + " m D+." : "" }));
+      s.push(sess(d(6), "footing", "Sortie enchaînée", easy(M * 0.18, "Course facile sur jambes fatiguées")));
     }
-    return s.filter(function (x) { return x.date < race; });
+    return s.filter(function (x) { return x.date < race.date; });
   }
 
-  // ---------- Séance du jour ----------
-  function nextSession(profile, state, today) {
+  function gates(weeks, an, longPeak) {
+    var g = [];
+    var lastBase = weeks.filter(function (w) { return w.block === "Base"; }).pop();
+    if (lastBase) g.push({ key: "base-" + lastBase.monday, date: addDays(lastBase.monday, 6), c: "Fin de la Base : " + String(lastBase.hours).replace(".", ",") + " h/semaine sans séance orange ni rouge" });
+    weeks.filter(function (w) { return w.choc; }).forEach(function (w) { g.push({ key: "choc-" + w.monday, date: addDays(w.monday, 6), c: (an.stages > 1 ? "Bloc 3 jours" : "Week-end choc") + " du " + longDate(addDays(w.monday, an.stages > 1 ? 4 : 5)) + " sans douleur le lendemain" }); });
+    var t = weeks.filter(function (w) { return w.block === "Affûtage"; })[0];
+    if (t) g.push({ key: "go-" + t.monday, date: t.monday, c: "Avant l'affûtage : sortie de " + longPeak.toFixed(1).replace(".", ",") + " h faite, tibia calme" });
+    return g.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  }
+
+  // ---------- Séances d'une date ----------
+  function sessionsOn(profile, state, date, race) {
+    if (state.stopped) return [];
     if (state.mode === "reprise") {
-      var lv = LEVELS[Math.min(state.level, MAX_LEVEL) - 1];
-      return { date: state.nextDate, title: lv.title, min: totalMin(lv.blocks), blocks: lv.blocks, level: lv.n, phase: PHASES[lv.phase] };
+      var wk = repriseWeek(profile, state, mondayOf(date)).filter(function (x) { return x.date === date; });
+      if (state.restUntil && date <= state.restUntil) wk = wk.filter(function (x) { return x.kind === "velo"; });
+      return wk;
     }
-    var plan = buildPlan(profile, state);
-    for (var i = 0; i < plan.length; i++) for (var j = 0; j < plan[i].sessions.length; j++) {
-      var x = plan[i].sessions[j];
-      if (x.date >= state.nextDate) return Object.assign({ week: plan[i] }, x);
-    }
-    return null;
+    if (!race) return [];
+    var p = buildProgram(profile, state, race), out = [];
+    p.weeks.forEach(function (w) { w.sessions.forEach(function (x) { if (x.date === date) out.push(Object.assign({ week: w }, x)); }); });
+    if (state.restUntil && date <= state.restUntil) out = out.filter(function (x) { return x.kind === "velo"; });
+    return out;
+  }
+  function weekSessions(profile, state, monday, race) {
+    var out = [];
+    for (var i = 0; i < 7; i++) out = out.concat(sessionsOn(profile, state, addDays(monday, i), race));
+    return out;
   }
 
-  function totalMin(blocks) {
-    return blocks.reduce(function (t, b) { return t + (b.rep ? b.rep * b.steps.reduce(function (u, st) { return u + st.min; }, 0) : b.min); }, 0);
+  // ---------- Projection des semaines à venir ----------
+  // Hypothèse : une séance palier par semaine, toutes vertes → un palier toutes les 2 semaines.
+  function projection(profile, state, today, race, nWeeks) {
+    nWeeks = nWeeks || 26;
+    var monday = mondayOf(today), out = [];
+    var level = Math.min(state.level, MAX_LEVEL + 1), streak = state.streak;
+    var switchDate = state.mode === "ultra" ? (state.ultraStart || profile.switchDate) : null, passWeeks = 0;
+    var prog = null;
+    for (var i = 0; i < nWeeks; i++) {
+      var m = addDays(monday, i * 7), w = { monday: m, sessions: [] };
+      if (!switchDate) {
+        if (level <= MAX_LEVEL) {
+          w.mode = "reprise"; w.level = level;
+          w.sessions = repriseWeek(profile, { level: level }, m);
+          if (i > 0 || weekday(today) <= 1) { streak++; if (streak >= 2) { level++; streak = 0; } }
+        } else if (passWeeks < 3) {
+          w.mode = "passage"; w.level = MAX_LEVEL; passWeeks++;
+          w.sessions = repriseWeek(profile, { level: MAX_LEVEL }, m);
+          if (passWeeks === 3) switchDate = addDays(m, 7);
+        }
+      }
+      if (switchDate && m >= switchDate) {
+        if (!race || m >= race.date) { w.mode = "attente"; }
+        else {
+          if (!prog) prog = buildProgram(Object.assign({}, profile, { switchDate: switchDate }), { ultraStart: switchDate, reduce: state.reduce || {} }, race);
+          var pw = prog.weeks.filter(function (x) { return x.monday === m; })[0];
+          if (pw) { w.mode = "programme"; w.block = pw.block; w.choc = pw.choc; w.light = pw.light; w.dplus = pw.dplus; w.sessions = pw.sessions; }
+          else w.mode = "attente";
+        }
+      }
+      w.minutes = w.sessions.reduce(function (t, x) { return t + totalMin(x.blocks); }, 0);
+      w.runMinutes = w.sessions.filter(function (x) { return x.kind !== "velo"; }).reduce(function (t, x) { return t + totalMin(x.blocks); }, 0);
+      out.push(w);
+    }
+    return { weeks: out, switchDate: switchDate };
   }
 
   // ---------- Export Intervals.icu ----------
@@ -189,10 +308,12 @@
     if (/^Échauffement/.test(l)) lbl = "Échauffement";
     else if (/^Retour/.test(l)) lbl = "Retour au calme";
     else if (/^Descente/.test(l)) lbl = "Descente marchée";
-    else lbl = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : "Course";
+    else if (/^Cadence/.test(l)) lbl = "Cadence haute";
+    else if (/^Rando/.test(l)) lbl = "Rando";
+    else lbl = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : st.k === "velo" ? "Vélo" : "Course";
     return "- " + lbl + " " + dur(st.min) + " " + z;
   }
-  function intervalsText(blocks, note) {
+  function intervalsText(blocks) {
     var lines = [];
     blocks.forEach(function (b) {
       if (b.rep) { lines.push(""); lines.push(b.rep + "x"); b.steps.forEach(function (st) { lines.push(stepLine(st)); }); lines.push(""); }
@@ -200,31 +321,20 @@
     });
     return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   }
-  function intervalsEvent(session, sport) {
-    return {
-      category: "WORKOUT",
-      type: sport || "Run",
-      start_date_local: session.date + "T00:00:00",
-      name: session.title,
-      description: intervalsText(session.blocks, session.note),
-      moving_time: Math.round(totalMin(session.blocks) * 60),
-    };
+  function intervalsEvent(session) {
+    return { category: "WORKOUT", type: session.sport || "Run", start_date_local: session.date + "T00:00:00", name: session.title, description: intervalsText(session.blocks), moving_time: Math.round(totalMin(session.blocks) * 60) };
   }
 
-  // ---------- Estimation de la charge optimale ----------
+  // ---------- Estimation de la charge cible (fin de reprise) ----------
   function estimateOptimal(profile, state, today) {
-    if (state.mode === "ultra") {
-      var plan = buildPlan(profile, state), peak = profile.peakHours || 10;
-      for (var i = 0; i < plan.length; i++) if (plan[i].hours >= 0.9 * peak) return plan[i].monday;
-      return plan.length ? plan[plan.length - 1].monday : today;
-    }
-    var remaining = Math.max(0, (MAX_LEVEL + 1 - state.level) * 2 - state.streak);
-    var weeks = remaining / 2.5 * 1.25 + 11; // paliers restants puis montée de 4,5 h à 9 h (+10 %/sem, semaines allégées)
-    return addDays(today, Math.round(weeks * 7));
+    if (state.mode === "ultra") return null;
+    // même hypothèse que la projection : une séance palier verte par semaine, puis 3 semaines de test
+    return projection(profile, state, today, null, 80).switchDate || addDays(today, 560);
   }
 
-  var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, PHASES: PHASES, verdict: verdict, computeState: computeState, passage: passage, buildPlan: buildPlan,
-    nextSession: nextSession, totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal,
-    addDays: addDays, diffDays: diffDays, todayStr: todayStr, longDate: longDate, monthYear: monthYear, mondayOf: mondayOf };
+  var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, PHASES: PHASES, verdict: verdict, computeState: computeState, passage: passage,
+    repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, weekSessions: weekSessions,
+    totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal,
+    addDays: addDays, diffDays: diffDays, todayStr: todayStr, longDate: longDate, monthYear: monthYear, mondayOf: mondayOf, weekday: weekday };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Engine = api;
 })(this);

@@ -98,50 +98,52 @@ details summary{cursor:pointer;font-size:14px;font-weight:600;min-height:32px;di
   <button data-tab="today">Aujourd'hui</button>
   <button data-tab="journal">Journal</button>
   <button data-tab="plan">Plan</button>
-  <button data-tab="renfo">Renfo</button>
+  <button data-tab="proj">Projection</button>
+  <button data-tab="course">Course</button>
 </div></nav>
 <script src="engine.js"></script>
 <script>
 "use strict";
 var E = window.Engine;
 var KEY = "naqrun.v1";
-var RENFO = [
-  { t: "Montées sur pointes lentes", d: "3 × 15, descente en 3 secondes, genou tendu" },
-  { t: "Montées sur pointes genou fléchi", d: "3 × 15, descente lente" },
-  { t: "Relevés de pointes dos au mur", d: "3 × 20 (muscle tibial antérieur)" },
-  { t: "Marche sur les talons", d: "2 × 30 m" },
-  { t: "Équilibre sur une jambe", d: "3 × 30 s par jambe, yeux fermés si facile" },
-  { t: "Serviette ramassée avec les orteils", d: "2 × 1 min par pied" },
-];
-var DEFAULT = { profile: { startLevel: 6, raceDate: "2027-06-17", raceConfirmed: false, peakHours: 10, switchDate: null, hop: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "" }, logs: [], renfo: {}, sent: {} };
-var GATES = [
-  { k: "g1", date: "2027-02-15", w: "Mi-février", c: "Test de passage validé" },
-  { k: "g2", date: "2027-03-31", w: "Fin mars", c: "8 h/semaine depuis 3 semaines, sortie de 3 h sans douleur" },
-  { k: "g3", date: "2027-04-30", w: "Fin avril", c: "Week-end enchaîné 4 h + 3 h sans douleur" },
-  { k: "g4", date: "2027-05-31", w: "Fin mai", c: "Bloc de 3 jours (35 + 30 + 25 km) sans douleur" },
-];
+var DEFAULT = { profile: { startLevel: 6, switchDate: null, hop: false, heel: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "", hoursMax: 10, h0: 4.5, ref: { km: 29.6, dplus: 637, hours: 3.45 }, race: null }, logs: [], sent: {} };
+var RACE_EXAMPLE = { name: "Raid de l'Archange", date: "2027-06-17", km: 280, dplus: 3000, stages: 3, autonomy: true, terrain: "roulant", night: false, cutoffH: null, confirmed: false };
+var KINDS = { palier: "Footing palier", cadence: "Footing cadence", rando: "Rando-course", footing: "Footing", longue: "Sortie longue", cote: "Montées sur la côte", velo: "Vélo / elliptique", autre: "Autre course" };
 
-function load() { try { var x = JSON.parse(localStorage.getItem(KEY)); if (x && x.profile) { x.profile = Object.assign({}, DEFAULT.profile, x.profile); x.renfo = x.renfo || {}; x.sent = x.sent || {}; x.logs = x.logs || []; return x; } } catch (e) {} return JSON.parse(JSON.stringify(DEFAULT)); }
+function load() {
+  try {
+    var x = JSON.parse(localStorage.getItem(KEY));
+    if (x && x.profile) {
+      var p = Object.assign({}, DEFAULT.profile, x.profile);
+      p.ref = Object.assign({}, DEFAULT.profile.ref, x.profile.ref || {});
+      return { profile: p, logs: x.logs || [], sent: x.sent || {} };
+    }
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULT));
+}
 var DB = load();
 var saveOk = true;
 function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); saveOk = true; } catch (e) { saveOk = false; } }
-var UI = { tab: (location.hash || "#today").slice(1), draft: null, msg: {} };
+var UI = { tab: (location.hash || "#today").slice(1), draft: null, msg: {}, raceDraft: null };
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 function today() { return E.todayStr(); }
 function S() { return E.computeState(DB.profile, DB.logs, today()); }
+function cap(x) { return x.charAt(0).toUpperCase() + x.slice(1); }
+function num(x) { return String(x).replace(".", ","); }
 function chip(v, prov) {
   var lab = { vert: "Verte", orange: "Orange", rouge: "Rouge", stop: "Arrêt" }[v];
   return '<span class="chip ' + v + '"><span class="dot"></span>' + lab + (prov && v !== "stop" ? " (provisoire)" : "") + "</span>";
 }
 function hm(min) { min = Math.round(min); if (min < 60) return min + " min"; var h = Math.floor(min / 60), m = min % 60; return h + " h" + (m ? " " + String(m).padStart(2, "0") : ""); }
+function hh(hours) { return hm(hours * 60); }
 function stepsHtml(blocks) {
   function one(st) {
-    var kind = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : "Course";
-    var zone = st.k === "marche" ? "" : st.k === "cote" ? " · zone 3" : " · zone 2";
-    return '<li><i class="' + st.k + '" aria-hidden="true"></i><div><div class="t">' + esc(st.label || kind) + '</div><div class="d">' + hm(st.min) + zone + "</div></div></li>";
+    var kind = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : st.k === "velo" ? "Vélo" : "Course";
+    var zone = st.k === "marche" ? " · FC zone 1" : st.k === "cote" ? " · FC zone 3" : " · FC zone 2";
+    return '<li><i class="' + st.k + '" aria-hidden="true"></i><div><div class="t">' + esc(st.label || kind) + '</div><div class="d">' + hm(st.min < 1 ? 0 : st.min) .replace(/^0 min$/, Math.round(st.min * 60) + " s") + zone + "</div></div></li>";
   }
   return '<ul class="steps">' + blocks.map(function (b) {
-    if (b.rep) return '<li><div style="flex:1"><div class="t">' + b.rep + " répétitions</div><ul class=\"steps rep\" style=\"margin-top:8px\">" + b.steps.map(one).join("") + "</ul></div></li>";
+    if (b.rep) return '<li><div style="flex:1"><div class="t">' + b.rep + ' répétitions</div><ul class="steps rep" style="margin-top:8px">' + b.steps.map(one).join("") + "</ul></div></li>";
     return one(b);
   }).join("") + "</ul>";
 }
@@ -164,294 +166,341 @@ function ivError(e) {
   if (e.message === "network") return "Impossible de joindre Intervals.icu (pas de réseau, ou appel bloqué). Tu peux copier la séance et la coller dans Intervals.";
   return "Intervals.icu a répondu une erreur (" + e.message + ").";
 }
-function sendSession(session, key) {
-  var msgKey = "send-" + key;
-  if (!ivReady()) { UI.msg[msgKey] = { t: "err", m: "Renseigne d'abord ton compte Intervals.icu dans les réglages (icône en haut à droite)." }; render(); return; }
-  var ev = E.intervalsEvent(session), prev = DB.sent[session.date + "|" + session.title];
+var SESSIONS = {};
+function sendSession(key) {
+  var session = SESSIONS[key], msgKey = "send-" + key;
+  if (!ivReady()) { UI.msg[msgKey] = { t: "err", m: "Renseigne d'abord ton compte Intervals.icu dans les réglages (roue crantée sur l'écran Aujourd'hui)." }; render(); return; }
+  var ev = E.intervalsEvent(session), id = session.date + "|" + session.title, prev = DB.sent[id];
   UI.msg[msgKey] = { t: "", m: "Envoi en cours…" }; render();
-  var p = prev ? ivFetch("/events/" + prev, { method: "PUT", body: JSON.stringify(ev) }).catch(function (e) { if (e.message === "http 404") return ivFetch("/events", { method: "POST", body: JSON.stringify(ev) }); throw e; })
-               : ivFetch("/events", { method: "POST", body: JSON.stringify(ev) });
+  var post = function () { return ivFetch("/events", { method: "POST", body: JSON.stringify(ev) }); };
+  var p = prev ? ivFetch("/events/" + prev, { method: "PUT", body: JSON.stringify(ev) }).catch(function (e) { if (e.message === "http 404") return post(); throw e; }) : post();
   p.then(function (res) {
-    if (res && res.id != null) DB.sent[session.date + "|" + session.title] = res.id;
+    if (res && res.id != null) DB.sent[id] = res.id;
     save();
-    UI.msg[msgKey] = { t: "ok", m: "Séance envoyée à Intervals.icu pour le " + E.longDate(session.date) + ". Elle arrive sur ta Fenix à la prochaine synchro Garmin Connect (les 7 prochains jours sont envoyés)." };
+    UI.msg[msgKey] = { t: "ok", m: "Envoyée à Intervals.icu pour " + E.longDate(session.date) + ". Elle arrive sur ta Fenix à la prochaine synchro Garmin Connect (les 7 prochains jours sont transmis)." };
     render();
   }).catch(function (e) { UI.msg[msgKey] = { t: "err", m: ivError(e), copy: true }; render(); });
 }
-function copySession(session, key) {
+function copySession(key) {
+  var session = SESSIONS[key]; if (!session) return;
   var txt = session.title + "\n\n" + E.intervalsText(session.blocks);
-  var done = function () { UI.msg["send-" + key] = { t: "ok", m: "Texte copié. Colle-le dans une séance de course du calendrier Intervals.icu." }; render(); };
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { prompt("Copie ce texte :", txt); });
-  else { prompt("Copie ce texte :", txt); }
+  var done = function () { UI.msg["send-" + key] = { t: "ok", m: "Texte copié. Colle-le dans une séance du calendrier Intervals.icu." }; render(); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { prompt("Copie ce texte :", txt); }); else prompt("Copie ce texte :", txt);
 }
 function msgHtml(key) {
   var m = UI.msg["send-" + key]; if (!m) return "";
   return '<div class="notice ' + m.t + '">' + esc(m.m) + "</div>" + (m.copy ? '<button class="small" data-act="copy" data-key="' + key + '">Copier la séance</button>' : "");
 }
+var WATCH = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3"></rect><path d="M9 6l1-3h4l1 3M9 18l1 3h4l1-3M12 10v2l1 1"></path></svg>';
+
+// ---------- Cartes ----------
+function sessionCard(sess, key, label) {
+  SESSIONS[key] = sess;
+  var min = E.totalMin(sess.blocks);
+  var sub = sess.level ? "Palier " + sess.level + " sur " + E.MAX_LEVEL + " · " + sess.phase + " · la séance qui fait progresser" : (sess.week ? sess.week.block + " · semaine " + sess.week.i + " · " + num(sess.week.hours) + " h prévues" : KINDS[sess.kind] || "");
+  return '<section class="card"><div class="row"><h2>' + esc(label) + '</h2><span class="chip soft">' + esc(KINDS[sess.kind] || sess.kind) + "</span></div>" +
+    '<div class="hero"><b>' + Math.round(min) + '</b><span>min au total</span></div>' +
+    '<p style="font-family:var(--head);font-weight:700;font-size:20px">' + esc(sess.title) + '</p><p class="muted">' + esc(sub) + "</p>" +
+    stepsHtml(sess.blocks) + (sess.note ? '<div class="notice">' + esc(sess.note) + "</div>" : "") +
+    '<button class="primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix 7X</button>" + msgHtml(key) +
+    (sess.kind !== "velo" ? '<button data-act="tolog" data-key="' + key + '">J\'ai fait la séance : remplir le journal</button>' : "") + "</section>";
+}
+function weekList(sessions, prefix) {
+  if (!sessions.length) return '<p class="muted">Aucune séance prévue.</p>';
+  return sessions.map(function (x, j) {
+    var key = prefix + j; SESSIONS[key] = x;
+    return '<div class="sess"><span>' + esc(cap(E.longDate(x.date))) + '<br><span class="muted">' + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><button class="small" data-act="send" data-key="' + key + '">Envoyer</button></div>' + msgHtml(key);
+  }).join("");
+}
 
 // ---------- Vues ----------
-var SESSIONS = {}; // clé -> séance, pour les boutons
-function sessionCard(sess, key, opts) {
-  SESSIONS[key] = sess;
-  opts = opts || {};
-  var min = E.totalMin(sess.blocks);
-  var sub = sess.level ? "Palier " + sess.level + " sur " + E.MAX_LEVEL + " · " + sess.phase : (sess.week ? sess.week.block + " · semaine " + sess.week.i + " · " + sess.week.hours + " h prévues" : "");
-  return '<section class="card">' +
-    (opts.label ? '<div class="row"><h2>' + esc(opts.label) + "</h2>" + (opts.right || "") + "</div>" : "") +
-    '<div class="hero"><b>' + Math.round(min) + '</b><span>min au total</span></div>' +
-    '<p style="font-family:var(--head);font-weight:700;font-size:20px">' + esc(sess.title) + "</p>" +
-    '<p class="muted">' + esc(sub) + "</p>" +
-    stepsHtml(sess.blocks) +
-    (sess.note ? '<p class="muted">' + esc(sess.note) + "</p>" : "") +
-    '<button class="primary" data-act="send" data-key="' + key + '"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3"></rect><path d="M9 6l1-3h4l1 3M9 18l1 3h4l1-3M12 10v2l1 1"></path></svg>Envoyer sur la Fenix 7X</button>' +
-    msgHtml(key) +
-    '<p class="muted" style="text-align:center">Terrain souple de préférence. Arrêt si la douleur dépasse 3/10.</p></section>';
-}
+var GEAR = '<button class="iconbtn" data-act="settings" aria-label="Réglages"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></button>';
 
 function vToday() {
   var s = S(), t = today(), p = DB.profile, h = "";
-  h += '<header class="hdr"><div><p class="muted">' + esc(cap(E.longDate(t))) + '</p><h1>Aujourd\'hui</h1></div><div style="display:flex;gap:6px;align-items:center"><span class="chip soft">' + (s.mode === "ultra" ? "Plan Raid" : "Mode reprise") + '</span><button class="iconbtn" data-act="settings" aria-label="Réglages"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></button></div></header>';
-  if (!saveOk) h += '<div class="notice err">Le stockage du téléphone est indisponible : tes saisies ne seront pas gardées. Ouvre l\'appli dans Safari (pas en navigation privée).</div>';
-  if (!DB.logs.length && !p._welcomed) h += '<section class="card"><h2>Bienvenue sur NaqRun</h2><p class="muted">Tu démarres au palier ' + p.startLevel + ' (' + esc(E.LEVELS[p.startLevel - 1].title) + '). Change-le dans les réglages si besoin, et relie ton compte Intervals.icu pour envoyer les séances sur ta Fenix.</p><div class="btns"><button class="small" data-act="settings">Réglages</button><button class="small" data-act="welcome">Compris</button></div></section>';
-  if (s.stopped) {
-    h += '<section class="card" style="border-color:var(--r)"><div class="row"><h2>Arrêt</h2>' + chip("stop") + '</div><p>Tu as signalé un signe d\'arrêt (douleur précise sur l\'os, douleur au repos ou boiterie). Arrête la course et demande un avis médical : ce sont des signes possibles de fracture de fatigue.</p><button data-act="clearstop">J\'ai eu le feu vert médical</button></section>';
-  }
+  h += '<header class="hdr"><div><p class="muted">' + esc(cap(E.longDate(t))) + '</p><h1>Aujourd\'hui</h1></div><div style="display:flex;gap:6px;align-items:center"><span class="chip soft">' + (s.mode === "ultra" ? "Programme" : "Reprise") + "</span>" + GEAR + "</div></header>";
+  if (!saveOk) h += '<div class="notice err">Le stockage du téléphone est indisponible : tes saisies ne seront pas gardées.</div>';
+  if (!DB.logs.length && !p._welcomed) h += '<section class="card"><h2>Bienvenue sur NaqRun</h2><p class="muted">Tu démarres au palier ' + p.startLevel + " (" + esc(E.LEVELS[p.startLevel - 1].title) + '), d\'après tes dernières sorties. Relie Intervals.icu dans les réglages pour envoyer les séances sur ta Fenix.</p><div class="btns"><button class="small" data-act="settings">Réglages</button><button class="small" data-act="welcome">Compris</button></div></section>';
+  if (s.stopped) h += '<section class="card" style="border-color:var(--r)"><div class="row"><h2>Arrêt</h2>' + chip("stop") + '</div><p>Tu as signalé un signe d\'arrêt (douleur précise sur l\'os, douleur au repos ou boiterie). Arrête la course et demande un avis médical : ce sont des signes possibles de fracture de fatigue.</p><button data-act="clearstop">J\'ai eu le feu vert médical</button></section>';
   var pending = s.logs.filter(function (l) { return l.morning == null && l.date < t; }).pop();
-  if (pending) {
-    h += '<section class="card"><div class="row"><h2>Note du matin</h2><span class="muted">séance du ' + esc(E.longDate(pending.date)) + '</span></div><label class="field">Douleur au réveil <span class="val" id="mv">0/10</span><input type="range" min="0" max="10" value="0" id="morningQuick" data-out="mv"></label><button class="primary" data-act="morning" data-id="' + pending.id + '">Valider la note</button></section>';
-  }
+  if (pending) h += '<section class="card"><div class="row"><h2>Note du matin</h2><span class="muted">' + esc(E.longDate(pending.date)) + '</span></div><label class="field"><span class="row">Douleur au tibia au réveil <span class="val" id="mv">0/10</span></span><input type="range" min="0" max="10" value="0" id="morningQuick"></label><button class="primary" data-act="morning" data-id="' + pending.id + '">Valider la note</button></section>';
+  var race = p.race;
   if (!s.stopped) {
-    var ns = E.nextSession(p, s, t);
-    if (!ns) h += '<section class="card"><h2>Plan terminé</h2><p class="muted">Bonne course sur le Raid de l\'Archange !</p></section>';
+    var list = E.sessionsOn(p, s, t, race);
+    if (s.mode === "ultra" && !race) h += '<section class="card"><h2>Définis ta course</h2><p class="muted">Ta reprise est validée. Renseigne ta course objectif pour générer le programme.</p><button class="primary" data-act="tab" data-tab="course">Fiche course</button></section>';
+    else if (list.length) list.forEach(function (x, i) { h += sessionCard(x, "today" + i, "Séance du jour"); });
     else {
-      var rest = ns.date > t;
-      h += sessionCard(ns, "today", { label: rest ? "Prochaine séance" : "Séance du jour", right: '<span class="muted">' + (rest ? esc(cap(E.longDate(ns.date))) : "") + "</span>" });
-      if (rest) h += '<div class="notice">Repos aujourd\'hui' + (s.lastVerdict === "rouge" ? " (48 h après une séance rouge)" : "") + '. Le renfo reste possible.</div>';
-      else h += '<button data-act="tolog">J\'ai fait la séance : remplir le journal</button>';
+      var next = null;
+      for (var i = 1; i <= 14 && !next; i++) { var l2 = E.sessionsOn(p, s, E.addDays(t, i), race); if (l2.length) next = l2[0]; }
+      h += '<section class="card"><h2>Repos aujourd\'hui</h2><p class="muted">' + (s.resting ? "48 h de repos après une séance rouge : vélo possible, pas de course." : "Pas de séance prévue.") + "</p>" + (next ? '<p>Prochaine séance : <strong>' + esc(next.title) + "</strong>, " + esc(E.longDate(next.date)) + ".</p>" : "") + "</section>";
     }
   }
   if (s.lastVerdict) {
     var lastLog = s.logs[s.logs.length - 1];
-    var txt = s.mode === "ultra" ? "Plan Raid en cours." : (s.done ? "Reprise terminée : passe le test de passage dans l'onglet Plan." : (s.streak + " séance verte sur 2 pour passer au palier " + Math.min(s.level + 1, 15) + "."));
-    h += '<section class="card"><div class="row"><h2>Dernière séance</h2>' + chip(lastLog._v, lastLog._provisional) + '</div><p class="muted">' + esc(txt) + "</p>" +
-      (s.mode === "reprise" ? '<div class="bar" aria-hidden="true"><div style="width:' + Math.round(Math.min(s.level - 1, 15) / 15 * 100) + '%"></div></div><div class="row"><span class="muted">Reprise</span><span class="muted">Palier ' + Math.min(s.level, 15) + " / 15</span></div>" : "") + "</section>";
+    var txt = s.mode === "ultra" ? "Programme en cours." : s.done ? "Paliers terminés : passe le test de passage (onglet Plan)." : s.streak + " séance palier verte sur 2 pour passer au palier " + Math.min(s.level + 1, 15) + ".";
+    h += '<section class="card"><div class="row"><h2>Dernière séance</h2>' + chip(lastLog._v, lastLog._provisional) + '</div><p class="muted">' + esc(txt) + "</p>" + (s.mode === "reprise" ? '<div class="bar" aria-hidden="true"><div style="width:' + Math.round(Math.min(s.level - 1, 15) / 15 * 100) + '%"></div></div><div class="row"><span class="muted">Reprise</span><span class="muted">Palier ' + Math.min(s.level, 15) + " / 15</span></div>" : "") + "</section>";
   }
-  var days = E.diffDays(t, p.raceDate);
-  h += '<section class="card"><div class="row"><h2>Raid de l\'Archange</h2><span class="muted">' + (days >= 0 ? "J-" + days : "passé") + '</span></div><p class="muted">280 km · 3 étapes · ' + esc(E.monthYear(p.raceDate)) + (p.raceConfirmed ? "" : ", date à confirmer") + '</p><p>Charge optimale estimée : <strong>' + esc(E.monthYear(E.estimateOptimal(p, s, t))) + "</strong></p></section>";
-  var done = (DB.renfo[t] || []).filter(Boolean).length;
-  h += '<section class="card"><div class="row"><h2>Renfo tibia</h2><span class="muted">' + done + " / " + RENFO.length + ' aujourd\'hui</span></div><p class="muted">2 séances par semaine, 15 min.</p><button class="small" data-act="tab" data-tab="renfo">Ouvrir le renfo</button></section>';
+  if (race) {
+    var days = E.diffDays(t, race.date);
+    h += '<section class="card"><div class="row"><h2>' + esc(race.name || "Course objectif") + '</h2><span class="muted">' + (days >= 0 ? "J-" + days : "passée") + '</span></div><p class="muted">' + num(race.km) + " km · " + race.dplus + " m D+" + (race.stages > 1 ? " · " + race.stages + " étapes" : "") + " · " + esc(E.monthYear(race.date)) + (race.confirmed ? "" : ", date à confirmer") + "</p>" + (s.mode === "reprise" ? '<p>Fin de reprise estimée : <strong>' + esc(E.monthYear(E.estimateOptimal(p, s, t))) + "</strong></p>" : "") + "</section>";
+  } else if (s.mode === "reprise") {
+    h += '<section class="card"><h2>Objectif</h2><p class="muted">Fin de reprise estimée : <strong style="color:var(--text)">' + esc(E.monthYear(E.estimateOptimal(p, s, t))) + '</strong>. Tu peux déjà renseigner une course pour vérifier si elle est faisable.</p><button class="small" data-act="tab" data-tab="course">Fiche course</button></section>';
+  }
   return h;
 }
-
-function cap(x) { return x.charAt(0).toUpperCase() + x.slice(1); }
 
 function vJournal() {
   var s = S(), t = today(), h = "";
   if (!UI.draft) {
-    var ns = s.stopped ? null : E.nextSession(DB.profile, s, t);
-    UI.draft = { date: t, title: ns && ns.date <= t ? ns.title : (ns ? ns.title : "Séance libre"), level: ns && ns.level || null, during: 0, after: 0, morning: null, increasing: false, flags: [false, false, false], note: "", activity: null };
+    var runs = E.sessionsOn(DB.profile, s, t, DB.profile.race).filter(function (x) { return x.kind !== "velo"; });
+    UI.draft = { date: t, kind: runs[0] ? runs[0].kind : (s.mode === "reprise" ? "palier" : "footing"), title: runs[0] ? runs[0].title : "", during: 0, after: 0, morning: null, increasing: false, flags: [false, false, false], note: "", activity: null };
   }
   var d = UI.draft;
-  h += '<header class="hdr"><div><p class="muted">Après chaque séance, puis le lendemain matin</p><h1>Journal</h1></div></header>';
+  h += '<header class="hdr"><div><p class="muted">Après chaque course, puis le lendemain matin</p><h1>Journal</h1></div></header>';
   h += '<section class="card"><h2>Nouvelle séance</h2>' +
     '<label class="field">Date<input type="date" id="dDate" value="' + esc(d.date) + '" max="' + t + '"></label>' +
-    '<label class="field">Séance<input type="text" id="dTitle" value="' + esc(d.title) + '"></label>' +
-    '<button class="small" data-act="fetchact"' + (ivReady() ? "" : " disabled") + '>Récupérer la sortie depuis Intervals.icu</button>' +
+    '<label class="field">Type<select id="dKind">' + Object.keys(KINDS).filter(function (k) { return k !== "velo"; }).map(function (k) { return '<option value="' + k + '"' + (k === d.kind ? " selected" : "") + ">" + KINDS[k] + "</option>"; }).join("") + "</select></label>" +
+    '<label class="field">Intitulé<input type="text" id="dTitle" value="' + esc(d.title) + '" placeholder="Ex. 40 min continu"></label>' +
+    '<button class="small" data-act="fetchact"' + (ivReady() ? "" : " disabled") + ">Récupérer la sortie depuis Intervals.icu</button>" +
     (UI.msg.act ? '<div class="notice ' + UI.msg.act.t + '">' + esc(UI.msg.act.m) + "</div>" : "") +
-    (d.activity ? '<div class="grid4">' + stat(d.activity.km, "km") + stat(d.activity.time, "durée") + stat(d.activity.hr || "—", "FC moy.") + stat(d.activity.load || "—", "charge") + "</div>" : "") +
+    (d.activity ? '<div class="grid4">' + stat(d.activity.km, "km") + stat(d.activity.time, "durée") + stat(d.activity.hr || "—", "FC moy.") + stat(d.activity.cad || "—", "cadence") + "</div>" + (d.activity.cad && d.activity.cad < 165 ? '<div class="notice">Cadence sous 165 pas/min : vise des pas plus courts et plus rapides.</div>' : "") : "") +
     "</section>";
-  h += '<section class="card"><h2>Douleur au tibia</h2>' +
-    slider("Pendant la séance", "during", d.during) + slider("Juste après", "after", d.after) +
-    '<label class="check"><input type="checkbox" id="mLater"' + (d.morning == null ? " checked" : "") + '>Je donnerai la note du lendemain matin plus tard</label>' +
+  h += '<section class="card"><h2>Douleur au tibia</h2>' + slider("Pendant la séance", "during", d.during) + slider("Juste après", "after", d.after) +
+    '<label class="check"><input type="checkbox" id="mLater"' + (d.morning == null ? " checked" : "") + ">Je donnerai la note du lendemain matin plus tard</label>" +
     (d.morning == null ? "" : slider("Le lendemain matin", "morning", d.morning)) +
     '<label class="check"><input type="checkbox" id="dInc"' + (d.increasing ? " checked" : "") + ">La douleur a augmenté pendant la séance</label></section>";
-  h += '<section class="card"><h2>Signes d\'arrêt</h2>' +
-    ["Douleur précise sur un point de l'os", "Douleur la nuit ou au repos", "Boiterie à la marche"].map(function (lab, i) {
-      return '<label class="check"><input type="checkbox" data-flag="' + i + '"' + (d.flags[i] ? " checked" : "") + ">" + esc(lab) + "</label>";
-    }).join("") + '<p class="muted">Une seule case cochée : arrêt et avis médical.</p></section>';
-  h += '<section class="card"><label class="field">Note libre<textarea id="dNote" placeholder="Terrain, chaussures, sensations…">' + esc(d.note) + '</textarea></label>' +
-    '<div id="verdictBox">' + verdictHtml(d) + '</div><button class="primary" data-act="savelog">Enregistrer</button></section>';
+  h += '<section class="card"><h2>Signes d\'arrêt</h2>' + ["Douleur précise sur un point de l'os (moins de 5 cm)", "Douleur la nuit ou au repos", "Boiterie à la marche"].map(function (lab, i) {
+    return '<label class="check"><input type="checkbox" data-flag="' + i + '"' + (d.flags[i] ? " checked" : "") + ">" + esc(lab) + "</label>";
+  }).join("") + '<p class="muted">Une seule case cochée : arrêt et avis médical.</p></section>';
+  h += '<section class="card"><label class="field">Note libre<textarea id="dNote" placeholder="Terrain, chaussures, sensations…">' + esc(d.note) + '</textarea></label><div id="verdictBox">' + verdictHtml(d) + '</div><button class="primary" data-act="savelog">Enregistrer</button></section>';
   var logs = s.logs.slice().reverse();
   h += '<section class="card"><h2>Historique</h2>' + (logs.length ? logs.map(function (l) {
-    return '<div class="log"><div class="row"><strong style="font-size:14px">' + esc(cap(E.longDate(l.date))) + "</strong>" + chip(l._v, l._provisional) + '</div><span class="muted">' + esc(l.title) + " · pendant " + l.during + "/10 · après " + l.after + "/10 · matin " + (l.morning == null ? "—" : l.morning + "/10") + (l.activity ? " · " + esc(l.activity.km) + " km" : "") + "</span>" +
-      (l.note ? '<span class="muted">' + esc(l.note) + "</span>" : "") +
-      '<div class="btns">' + (l.morning == null ? '<button class="small" data-act="addmorning" data-id="' + l.id + '">Ajouter la note du matin</button>' : "") + '<button class="small" data-act="dellog" data-id="' + l.id + '">Supprimer</button></div></div>';
+    return '<div class="log"><div class="row"><strong style="font-size:14px">' + esc(cap(E.longDate(l.date))) + "</strong>" + chip(l._v, l._provisional) + '</div><span class="muted">' + esc(KINDS[l.kind] || "Course") + (l.title ? " · " + esc(l.title) : "") + " · pendant " + l.during + "/10 · après " + l.after + "/10 · matin " + (l.morning == null ? "—" : l.morning + "/10") + (l.activity ? " · " + esc(l.activity.km) + " km" : "") + "</span>" +
+      (l.note ? '<span class="muted">' + esc(l.note) + "</span>" : "") + '<div class="btns">' + (l.morning == null ? '<button class="small" data-act="addmorning" data-id="' + l.id + '">Ajouter la note du matin</button>' : "") + '<button class="small" data-act="dellog" data-id="' + l.id + '">Supprimer</button></div></div>';
   }).join("") : '<p class="muted">Aucune séance enregistrée.</p>') + "</section>";
   return h;
 }
-function verdictHtml(d) { var v = E.verdict(d); return '<div class="row"><h2>Prévision</h2>' + chip(v, d.morning == null) + '</div><p class="muted">' + esc(explain(v, d.morning == null)) + "</p>"; }
 function stat(v, l) { return '<div class="stat"><b>' + esc(v) + "</b><span>" + esc(l) + "</span></div>"; }
 function slider(label, key, val) { return '<label class="field"><span class="row">' + esc(label) + ' <span class="val" id="o-' + key + '">' + val + '/10</span></span><input type="range" min="0" max="10" value="' + val + '" data-pain="' + key + '"></label>'; }
-function explain(v, prov) {
-  var m = { vert: "Séance validée. Deux vertes de suite : palier suivant.", orange: "Tu refais le même palier à la prochaine séance.", rouge: "Recul de 2 paliers et 48 h de repos.", stop: "Arrête la course et demande un avis médical." }[v];
-  return m + (prov && v !== "stop" ? " Confirmée après la note du lendemain matin." : "");
+function verdictHtml(d) {
+  var v = E.verdict(d), prov = d.morning == null;
+  var m = { vert: d.kind === "palier" ? "Séance validée. Deux séances palier vertes de suite : palier suivant." : "Séance validée (seules les séances palier font monter de palier).", orange: "Tu refais le même palier.", rouge: "Recul de 2 paliers et 48 h sans course.", stop: "Arrête la course et demande un avis médical." }[v];
+  return '<div class="row"><h2>Prévision</h2>' + chip(v, prov) + '</div><p class="muted">' + esc(m + (prov && v !== "stop" ? " Confirmée après la note du lendemain matin." : "")) + "</p>";
 }
 
 function vPlan() {
-  var s = S(), t = today(), p = DB.profile, h = "";
-  h += '<header class="hdr"><div><p class="muted">280 km · 3 étapes · ≈ 3 000 m D+</p><h1>Plan Raid</h1></div></header>';
-  var weeksRep = s.mode === "reprise" ? 13 : 0;
-  var ph = [["Reprise", 13], ["Base", 5], ["Constr.", 6], ["Pic", 3], ["Affût.", 3]];
-  var cur = s.mode === "reprise" ? 0 : null, plan = null, curWeek = null;
-  if (s.mode === "ultra") { plan = E.buildPlan(p, s); curWeek = plan.filter(function (w) { return w.monday <= t; }).pop() || plan[0]; cur = { Base: 1, Construction: 2, Pic: 3, "Affûtage": 4 }[curWeek.block]; }
-  h += '<section class="card"><div class="row"><h2>Phases</h2><span class="muted">→ ' + esc(E.monthYear(p.raceDate)) + '</span></div><div class="phases" aria-hidden="true">' + ph.map(function (x, i) { return '<div style="flex:' + x[1] + '" class="' + (i <= cur ? "on" : "") + '"></div>'; }).join("") + '</div><div class="plabels">' + ph.map(function (x) { return '<span style="flex:' + x[1] + '">' + x[0] + "</span>"; }).join("") + "</div>" +
-    '<p class="muted">' + (s.mode === "reprise" ? "Tu es en reprise, palier " + Math.min(s.level, 15) + " sur 15. Le plan Raid démarre après le test de passage." : "Semaine " + curWeek.i + " sur " + plan.length + " · bloc " + curWeek.block + ".") + "</p></section>";
+  var s = S(), t = today(), p = DB.profile, h = "", monday = E.mondayOf(t);
+  h += '<header class="hdr"><div><p class="muted">' + (s.mode === "ultra" ? "Programme ultra-trail · finisher" : "Reprise de charge · périostite") + '</p><h1>Plan</h1></div></header>';
   if (s.mode === "reprise") {
+    h += '<section class="card"><h2>Cette semaine</h2><p class="muted">Seule la séance palier fait progresser. Les autres construisent l\'endurance en ménageant le tibia.</p>' + weekList(E.weekSessions(p, s, monday, null), "w0s") + "</section>";
+    h += '<section class="card"><h2>Semaine prochaine</h2>' + weekList(E.weekSessions(p, s, E.addDays(monday, 7), null), "w1s") + '<p class="muted">Calculée avec ton palier actuel : elle s\'ajuste à chaque séance enregistrée.</p></section>';
     var ps = E.passage(p, s, t);
-    h += '<section class="card"><h2>Test de passage</h2>' + ps.items.map(function (it) {
+    h += '<section class="card"><h2>Test de passage vers le programme</h2>' + ps.items.map(function (it) {
       if (it.manual) return '<label class="check"><input type="checkbox" data-pass="' + it.k + '"' + (it.ok ? " checked" : "") + ">" + esc(it.label) + (it.required ? "" : " (facultatif)") + "</label>";
       return '<div class="row" style="min-height:36px"><span style="font-size:14px">' + esc(it.label) + (it.detail ? '<br><span class="muted">' + esc(it.detail) + "</span>" : "") + "</span>" + (it.ok ? '<span class="chip vert">OK</span>' : '<span class="chip soft">À faire</span>') + "</div>";
-    }).join("") + '<button class="primary" data-act="switch"' + (ps.ready ? "" : " disabled") + ">Passer au plan Raid</button></section>";
+    }).join("") + '<button class="primary" data-act="switch"' + (ps.ready ? "" : " disabled") + ">Passer au programme ultra</button></section>";
     h += '<section class="card"><h2>Paliers de reprise</h2>' + E.LEVELS.map(function (lv) {
       var cls = lv.n < s.level ? "done" : lv.n === s.level ? "cur" : "";
       return '<div class="lv ' + cls + '"><span class="n">' + lv.n + "</span><span>" + esc(lv.title) + '<br><span class="muted">' + E.PHASES[lv.phase] + "</span></span></div>";
     }).join("") + "</section>";
-  } else {
-    h += '<section class="card"><h2>Semaines</h2>' + plan.map(function (w) {
-      var isCur = w === curWeek;
-      return '<details class="week' + (isCur ? " cur" : "") + '"' + (isCur ? " open" : "") + '><summary>S' + w.i + " · " + esc(cap(E.longDate(w.monday))) + " · " + w.block + " · " + w.hours + " h" + (w.light ? " (allégée)" : "") + "</summary>" +
-        w.sessions.map(function (x, j) {
-          var key = "w" + w.i + "s" + j; SESSIONS[key] = x;
-          return '<div class="sess"><span>' + esc(cap(E.longDate(x.date))) + "<br><span class=\"muted\">" + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><button class="small" data-act="send" data-key="' + key + '">Envoyer</button></div>' + msgHtml(key);
-        }).join("") + "</details>";
-    }).join("") + "</section>";
+    return h;
   }
-  h += '<section class="card"><h2>Points de décision</h2><ol class="tl">' + GATES.map(function (g) {
-    var ok = g.k === "g1" ? !!p.switchDate : !!p.gates[g.k];
-    var late = !ok && t > g.date;
-    return '<li><span class="c' + (ok ? " done" : "") + '" aria-hidden="true"></span><div style="display:flex;flex-direction:column;gap:2px;flex:1"><span class="w">' + g.w + '</span><span style="font-size:14px">' + esc(g.c) + "</span>" +
-      (g.k === "g1" ? '<span class="muted">' + (ok ? "Validé" : "À venir") + "</span>" : '<label class="check"><input type="checkbox" data-gate="' + g.k + '"' + (ok ? " checked" : "") + ">Réussi</label>") +
-      (late ? '<span class="chip orange" style="align-self:flex-start">Non validé à temps</span>' : "") + "</div></li>";
-  }).join("") + '</ol><div class="notice">Point non validé : repli sur l\'étape 1 (83 km) ou La Barjo (80 km), même semaine. Vérifie auprès de l\'organisation si le changement de format est possible.</div></section>';
-  h += '<section class="card"><h2>Charge optimale</h2><p style="font-family:var(--head);font-weight:700;font-size:22px">' + esc(E.monthYear(E.estimateOptimal(p, s, t))) + '</p><p class="muted">Estimation recalculée après chaque séance : 8 à 10 h par semaine avec du D+.</p></section>';
+  if (!p.race) return h + '<section class="card"><h2>Pas encore de course</h2><p class="muted">Renseigne ta course objectif pour générer le programme.</p><button class="primary" data-act="tab" data-tab="course">Fiche course</button></section>';
+  var P = E.buildProgram(p, s, p.race), cur = P.weeks.filter(function (w) { return w.monday <= t; }).pop() || P.weeks[0];
+  var blocks = ["Base", "Construction", "Spécifique", "Affûtage"];
+  h += '<section class="card"><div class="row"><h2>' + esc(p.race.name || "Course") + '</h2><span class="muted">' + esc(E.monthYear(p.race.date)) + '</span></div><div class="phases" aria-hidden="true">' + blocks.map(function (b) { var n = P.weeks.filter(function (w) { return w.block === b; }).length; return n ? '<div style="flex:' + n + '" class="' + (blocks.indexOf(b) <= blocks.indexOf(cur.block) ? "on" : "") + '"></div>' : ""; }).join("") + '</div><div class="plabels">' + blocks.map(function (b) { var n = P.weeks.filter(function (w) { return w.block === b; }).length; return n ? '<span style="flex:' + n + '">' + b + "</span>" : ""; }).join("") + '</div><p class="muted">Semaine ' + cur.i + " sur " + P.weeks.length + " · pic à " + num(P.peak) + " h/semaine · sortie longue max " + hh(P.longPeak) + " · D+ max " + P.dplusPeak + " m/semaine.</p></section>";
+  h += '<section class="card"><h2>Semaines</h2>' + P.weeks.map(function (w) {
+    var isCur = w === cur, tags = [w.light ? "allégée" : "", w.choc ? (P.analysis.stages > 1 ? "bloc 3 jours" : "week-end choc") : "", w.prepRace ? "course de prépa conseillée" : ""].filter(Boolean).join(" · ");
+    return '<details class="week' + (isCur ? " cur" : "") + '"' + (isCur ? " open" : "") + "><summary>S" + w.i + " · " + esc(cap(E.longDate(w.monday))) + " · " + w.block + " · " + num(w.hours) + " h · " + w.dplus + " m D+" + (tags ? " · " + tags : "") + "</summary>" + weekList(w.sessions, "u" + w.i + "s") + "</details>";
+  }).join("") + "</section>";
+  h += '<section class="card"><h2>Points de décision</h2><ol class="tl">' + P.gates.map(function (g) {
+    var ok = !!p.gates[g.key], late = !ok && t > g.date;
+    return '<li><span class="c' + (ok ? " done" : "") + '" aria-hidden="true"></span><div style="display:flex;flex-direction:column;gap:2px;flex:1"><span class="w">' + esc(cap(E.longDate(g.date))) + '</span><span style="font-size:14px">' + esc(g.c) + '</span><label class="check"><input type="checkbox" data-gate="' + esc(g.key) + '"' + (ok ? " checked" : "") + ">Réussi</label>" + (late ? '<span class="chip orange" style="align-self:flex-start">Non validé à temps</span>' : "") + "</div></li>";
+  }).join("") + '</ol><div class="notice">Un point non validé : envisage un format plus court ou une course plus tard. Être finisher passe avant la date.</div></section>';
   return h;
 }
 
-function vRenfo() {
-  var t = today(), list = DB.renfo[t] || [], h = "";
-  var wk = E.mondayOf(t), count = 0;
-  for (var i = 0; i < 7; i++) { var dd = E.addDays(wk, i); if ((DB.renfo[dd] || []).some(Boolean)) count++; }
-  h += '<header class="hdr"><div><p class="muted">Mollets, releveurs du pied, pied</p><h1>Renfo tibia</h1></div></header>';
-  h += '<section class="card"><div class="row"><h2>Aujourd\'hui</h2><span class="muted">' + count + ' séance(s) cette semaine, objectif 2</span></div>' + RENFO.map(function (r, i) {
-    return '<label class="check" style="align-items:flex-start"><input type="checkbox" data-renfo="' + i + '"' + (list[i] ? " checked" : "") + ' style="margin-top:2px"><span><strong style="font-weight:600">' + esc(r.t) + '</strong><br><span class="muted">' + esc(r.d) + "</span></span></label>";
-  }).join("") + '<p class="muted">Sans douleur. Si un exercice réveille la douleur du tibia, saute-le aujourd\'hui.</p></section>';
+function vCourse() {
+  var s = S(), t = today(), p = DB.profile;
+  var r = UI.raceDraft || (UI.raceDraft = Object.assign({}, p.race || RACE_EXAMPLE));
+  var start = s.mode === "ultra" ? (s.ultraStart || t) : E.estimateOptimal(p, s, t);
+  var h = "";
+  h += '<header class="hdr"><div><p class="muted">Objectif : être finisher</p><h1>Course</h1></div></header>';
+  h += '<section class="card"><h2>Fiche course</h2>' +
+    '<label class="field">Nom<input type="text" data-race="name" value="' + esc(r.name) + '"></label>' +
+    '<label class="field">Date<input type="date" data-race="date" value="' + esc(r.date) + '"></label>' +
+    '<label class="check"><input type="checkbox" data-race="confirmed"' + (r.confirmed ? " checked" : "") + ">Date officielle confirmée</label>" +
+    '<div class="btns"><label class="field">Distance (km)<input type="number" inputmode="decimal" data-race="km" value="' + esc(r.km) + '"></label><label class="field">D+ (m)<input type="number" inputmode="numeric" data-race="dplus" value="' + esc(r.dplus) + '"></label></div>' +
+    '<div class="btns"><label class="field">Étapes<input type="number" inputmode="numeric" min="1" max="10" data-race="stages" value="' + esc(r.stages || 1) + '"></label><label class="field">Temps limite total (h)<input type="number" inputmode="decimal" data-race="cutoffH" value="' + esc(r.cutoffH == null ? "" : r.cutoffH) + '" placeholder="facultatif"></label></div>' +
+    '<label class="field">Terrain<select data-race="terrain">' + [["roulant", "Roulant"], ["mixte", "Mixte"], ["technique", "Technique"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === r.terrain ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
+    '<label class="check"><input type="checkbox" data-race="autonomy"' + (r.autonomy ? " checked" : "") + ">En autonomie (sac, ravitaillement à porter)</label>" +
+    '<label class="check"><input type="checkbox" data-race="night"' + (r.night ? " checked" : "") + ">Passages de nuit</label>" +
+    '<button class="primary" data-act="saverace">Enregistrer la course</button>' + (p.race ? '<button class="small" data-act="delrace">Retirer la course</button>' : "") + (UI.msg.race ? '<div class="notice ' + UI.msg.race.t + '">' + esc(UI.msg.race.m) + "</div>" : "") + "</section>";
+  h += '<div id="raceAnalysis">' + raceAnalysis(r, s, start) + "</div>";
+  return h;
+}
+function raceAnalysis(r, s, start) {
+  var p = DB.profile, h = "", an = r.km > 0 && r.date ? E.analyseRace(r, p.ref, start) : null;
+  if (an) {
+    var feasTxt = { ok: "Faisable dans les délais recommandés.", tendu: "Tendu : moins de semaines que recommandé. Possible si la reprise se passe sans orange.", insuffisant: "Délai insuffisant pour finir en sécurité. Vise un format plus court ou une date plus lointaine." }[an.feas];
+    h += '<section class="card"><h2>Analyse</h2><div class="grid4">' + stat(an.kmE, "km-effort") + stat(an.ratio, "m D+/km") + stat(cap(an.profil), "profil") + stat(an.stages, an.stages > 1 ? "étapes" : "étape") + "</div>" +
+      '<p>Durée estimée : <strong>' + hh(an.totalHours) + "</strong>" + (an.stages > 1 ? " (≈ " + hh(an.stageHours) + " par étape)" : "") + '</p><p class="muted">Estimation à partir de ta course de référence (réglages), seulement pour dimensionner les sorties longues. Pas un objectif.</p>' +
+      (an.margin != null ? '<div class="notice ' + (an.margin >= 2 ? "ok" : an.margin >= 0 ? "" : "err") + '">Marge estimée sur le temps limite : ' + (an.margin >= 0 ? hh(an.margin) : "dépassement de " + hh(-an.margin)) + ".</div>" : "") +
+      '<p>Préparation recommandée (' + esc(an.prep.label) + ") : <strong>" + an.prep.min + " à " + an.prep.max_ + ' semaines</strong></p><p class="muted">Semaines disponibles depuis ' + (s.mode === "ultra" ? "le début du programme" : "la fin de reprise estimée (" + E.monthYear(start) + ")") + " : " + an.weeks + "</p>" +
+      '<div class="notice ' + (an.feas === "ok" ? "ok" : an.feas === "tendu" ? "" : "err") + '">' + esc(feasTxt) + "</div></section>";
+  }
+  return h;
+}
+
+
+function vProj() {
+  var s = S(), t = today(), p = DB.profile, h = "";
+  var pr = E.projection(p, s, t, p.race, 40);
+  var weeks = pr.weeks.filter(function (w) { return w.mode !== "attente"; });
+  var maxMin = Math.max.apply(null, weeks.map(function (w) { return w.minutes; }).concat([60]));
+  h += '<header class="hdr"><div><p class="muted">Si toutes les séances restent vertes</p><h1>Projection</h1></div></header>';
+  h += '<section class="card"><div class="row"><h2>Grandes étapes</h2></div>' +
+    '<p>Fin des paliers de reprise : <strong>' + esc((function () { var w = pr.weeks.filter(function (x) { return x.mode === "passage"; })[0]; return w ? cap(E.longDate(w.monday)) : (s.mode === "ultra" ? "faite" : "au-delà de 9 mois"); })()) + "</strong></p>" +
+    '<p>Début du programme ultra : <strong>' + esc(pr.switchDate ? cap(E.longDate(pr.switchDate)) : "à définir") + "</strong></p>" +
+    (p.race ? '<p>Course : <strong>' + esc(p.race.name) + "</strong>, " + esc(E.longDate(p.race.date)) + "</p>" : '<p class="muted">Ajoute une course dans l\'onglet Course pour voir le programme se projeter.</p>') +
+    '<p class="muted">Hypothèse : une séance palier par semaine, deux vertes de suite pour monter. Chaque séance orange ou rouge décale tout ; la projection se recalcule à chaque saisie.</p></section>';
+  var month = "", body = "";
+  weeks.forEach(function (w, i) {
+    var mth = E.monthYear(w.monday);
+    if (mth !== month) { if (body) h += body + "</section>"; month = mth; body = '<section class="card"><h2>' + esc(cap(mth)) + "</h2>"; }
+    var lab = w.mode === "programme" ? w.block + (w.choc ? " · choc" : "") + (w.light ? " · allégée" : "") : w.mode === "passage" ? "Test de passage" : "Palier " + w.level + " · " + E.LEVELS[w.level - 1].title;
+    var run = Math.round(w.runMinutes), tot = Math.round(w.minutes);
+    body += '<details class="week' + (i === 0 ? " cur" : "") + '"' + (i === 0 ? " open" : "") + '><summary style="display:flex;flex-direction:column;align-items:stretch;gap:6px">' +
+      '<span class="row"><span>Sem. du ' + esc(E.longDate(w.monday).replace(/^\S+ /, "")) + '</span><span class="muted">' + hm(tot) + "</span></span>" +
+      '<span class="muted" style="font-weight:500">' + esc(lab) + (w.dplus ? " · " + w.dplus + " m D+" : "") + "</span>" +
+      '<span class="bar" aria-hidden="true"><span style="display:block;height:100%;width:' + Math.round(tot / maxMin * 100) + '%;background:var(--accent);border-radius:999px"></span></span>' +
+      '<span class="muted">Course et rando : ' + hm(run) + " · vélo : " + hm(tot - run) + "</span></summary>" +
+      weekList(w.sessions, "p" + i + "s") + "</details>";
+  });
+  if (body) h += body + "</section>";
   return h;
 }
 
 function vSettings() {
   var p = DB.profile, h = "";
   h += '<header class="hdr"><div><p class="muted">NaqRun</p><h1>Réglages</h1></div><button class="small" data-act="tab" data-tab="today">Fermer</button></header>';
-  h += '<section class="card"><h2>Intervals.icu</h2><p class="muted">Pour envoyer les séances sur ta Fenix : dans Intervals.icu, Settings › Connections › Garmin Connect, coche « Upload planned workouts ». Puis copie ton identifiant d\'athlète et ta clé API (Settings › Developer Settings). Ils restent uniquement sur ce téléphone.</p>' +
+  h += '<section class="card"><h2>Intervals.icu</h2><p class="muted">Dans Intervals.icu : Settings › Connections › Garmin Connect, coche « Upload planned workouts ». Identifiant et clé API dans Settings › Developer Settings. Ils restent sur ce téléphone.</p>' +
     '<label class="field">Identifiant d\'athlète<input type="text" id="ivId" value="' + esc(p.intervalsId) + '" placeholder="i123456" autocapitalize="off" autocomplete="off"></label>' +
     '<label class="field">Clé API<input type="password" id="ivKey" value="' + esc(p.intervalsKey) + '" autocomplete="off"></label>' +
     '<button class="small" data-act="ivtest">Enregistrer et tester la connexion</button>' + (UI.msg.iv ? '<div class="notice ' + UI.msg.iv.t + '">' + esc(UI.msg.iv.m) + "</div>" : "") + "</section>";
-  h += '<section class="card"><h2>Programme</h2>' +
-    '<label class="field">Palier de départ<select id="startLevel">' + E.LEVELS.map(function (lv) { return '<option value="' + lv.n + '"' + (lv.n === p.startLevel ? " selected" : "") + ">" + lv.n + " · " + esc(lv.title) + "</option>"; }).join("") + "</select></label>" +
-    '<label class="field">Date du Raid<input type="date" id="raceDate" value="' + esc(p.raceDate) + '"></label>' +
-    '<label class="check"><input type="checkbox" id="raceConfirmed"' + (p.raceConfirmed ? " checked" : "") + ">Date officielle confirmée</label>" +
-    '<label class="field">Volume maximal visé (heures par semaine)<input type="number" id="peakHours" min="6" max="16" step="0.5" value="' + p.peakHours + '"></label>' +
-    (p.switchDate ? '<button class="small" data-act="unswitch">Revenir en mode reprise</button>' : "") +
-    "</section>";
-  h += '<section class="card"><h2>Sauvegarde</h2><p class="muted">Tes données sont sur ce téléphone. Copie la sauvegarde de temps en temps (dans Notes, par exemple) ; tu pourras la recoller ici.</p><div class="btns"><button class="small" data-act="export">Copier la sauvegarde</button><button class="small" data-act="import">Coller une sauvegarde</button></div>' + (UI.msg.bk ? '<div class="notice ' + UI.msg.bk.t + '">' + esc(UI.msg.bk.m) + "</div>" : "") + '<textarea id="bkText" class="' + (UI.showImport ? "" : "sr") + '" placeholder="Colle ta sauvegarde ici puis touche Importer"></textarea>' + (UI.showImport ? '<button class="small" data-act="doimport">Importer</button>' : "") + "</section>";
-  h += '<section class="card"><p class="muted">NaqRun ne remplace pas un avis médical. Si ton kiné t\'a donné d\'autres seuils de douleur, ils priment.</p></section>';
+  h += '<section class="card"><h2>Reprise</h2><label class="field">Palier de départ<select id="startLevel">' + E.LEVELS.map(function (lv) { return '<option value="' + lv.n + '"' + (lv.n === p.startLevel ? " selected" : "") + ">" + lv.n + " · " + esc(lv.title) + "</option>"; }).join("") + "</select></label>" + (p.switchDate ? '<button class="small" data-act="unswitch">Revenir en mode reprise</button>' : "") + "</section>";
+  h += '<section class="card"><h2>Programme</h2><label class="field">Heures maximum par semaine<input type="number" id="hoursMax" min="5" max="16" step="0.5" value="' + p.hoursMax + '"></label>' +
+    '<p class="muted">Course de référence pour estimer les durées (par défaut ton trail de Fermanville sur Strava).</p><div class="btns"><label class="field">km<input type="number" inputmode="decimal" id="refKm" value="' + p.ref.km + '"></label><label class="field">D+ (m)<input type="number" inputmode="numeric" id="refDp" value="' + p.ref.dplus + '"></label><label class="field">Durée (h)<input type="number" inputmode="decimal" step="0.05" id="refH" value="' + p.ref.hours + '"></label></div></section>';
+  h += '<section class="card"><h2>Sauvegarde</h2><p class="muted">Tes données sont sur ce téléphone. Copie la sauvegarde de temps en temps (dans Notes, par exemple).</p><div class="btns"><button class="small" data-act="export">Copier la sauvegarde</button><button class="small" data-act="import">Coller une sauvegarde</button></div>' + (UI.msg.bk ? '<div class="notice ' + UI.msg.bk.t + '">' + esc(UI.msg.bk.m) + "</div>" : "") + (UI.showImport ? '<textarea id="bkText" placeholder="Colle ta sauvegarde ici"></textarea><button class="small" data-act="doimport">Importer</button>' : "") + "</section>";
+  h += '<section class="card"><p class="muted">NaqRun ne remplace pas un avis médical. Si ton kiné t\'a donné d\'autres consignes, elles priment.</p></section>';
   return h;
 }
 
 // ---------- Rendu et événements ----------
 function render() {
   SESSIONS = {};
-  var v = { today: vToday, journal: vJournal, plan: vPlan, renfo: vRenfo, settings: vSettings }[UI.tab] || vToday;
+  var v = { today: vToday, journal: vJournal, plan: vPlan, proj: vProj, course: vCourse, settings: vSettings }[UI.tab] || vToday;
   document.getElementById("app").innerHTML = v();
   document.querySelectorAll("nav.tabs button").forEach(function (b) { if (b.dataset.tab === UI.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
 }
 function go(tab) { UI.tab = tab; try { history.replaceState(null, "", "#" + tab); } catch (e) {} render(); window.scrollTo(0, 0); }
-
-document.addEventListener("click", function (ev) {
-  var b = ev.target.closest("[data-act],[data-tab]"); if (!b) return;
-  if (b.closest("nav.tabs")) { go(b.dataset.tab); return; }
-  var a = b.dataset.act, s, t = today();
-  if (a === "tab") return go(b.dataset.tab);
-  if (a === "settings") return go("settings");
-  if (a === "welcome") { DB.profile._welcomed = true; save(); return render(); }
-  if (a === "send") return sendSession(SESSIONS[b.dataset.key], b.dataset.key);
-  if (a === "copy") return copySession(SESSIONS[b.dataset.key] || E.nextSession(DB.profile, S(), t), b.dataset.key);
-  if (a === "tolog") { UI.draft = null; return go("journal"); }
-  if (a === "clearstop") { DB.profile.clearedStop = t; save(); return render(); }
-  if (a === "morning") { var l = DB.logs.find(function (x) { return x.id === b.dataset.id; }); if (l) { l.morning = +document.getElementById("morningQuick").value; save(); } return render(); }
-  if (a === "addmorning") { var l2 = DB.logs.find(function (x) { return x.id === b.dataset.id; }); var val = prompt("Douleur au réveil, de 0 à 10 :", "0"); if (l2 && val != null && val !== "" && !isNaN(+val)) { l2.morning = Math.max(0, Math.min(10, Math.round(+val))); save(); } return render(); }
-  if (a === "dellog") { if (confirm("Supprimer cette séance du journal ?")) { DB.logs = DB.logs.filter(function (x) { return x.id !== b.dataset.id; }); save(); } return render(); }
-  if (a === "savelog") {
-    var d = UI.draft; readDraft();
-    if (!d.date || d.date > t) { alert("Choisis une date passée ou aujourd'hui."); return; }
-    var rec = Object.assign({}, d, { id: String(Date.now()), title: d.title || "Séance" });
-    DB.logs.push(rec); save(); UI.draft = null;
-    var v = E.verdict(rec);
-    UI.msg.act = null;
-    go(v === "stop" ? "today" : "today");
-    return;
-  }
-  if (a === "fetchact") {
-    readDraft();
-    var dd = UI.draft.date; UI.msg.act = { t: "", m: "Recherche de la sortie…" }; render();
-    ivFetch("/activities?oldest=" + dd + "&newest=" + dd).then(function (list) {
-      var runs = (list || []).filter(function (x) { return /Run|Hike|Walk/.test(x.type || ""); });
-      if (!runs.length) { UI.msg.act = { t: "err", m: "Aucune sortie trouvée ce jour-là dans Intervals.icu (la synchro Garmin peut prendre quelques minutes)." }; return render(); }
-      var r = runs[0], sec = r.moving_time || r.elapsed_time || 0;
-      UI.draft.activity = { km: ((r.distance || 0) / 1000).toFixed(2).replace(".", ","), time: Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"), hr: r.average_heartrate ? Math.round(r.average_heartrate) : null, load: r.icu_training_load != null ? Math.round(r.icu_training_load) : null, name: r.name || "" };
-      UI.msg.act = { t: "ok", m: "Sortie récupérée : " + (r.name || "course") + "." }; render();
-    }).catch(function (e) { UI.msg.act = { t: "err", m: ivError(e) }; render(); });
-    return;
-  }
-  if (a === "switch") { if (confirm("Passer au plan Raid à partir d'aujourd'hui ?")) { DB.profile.switchDate = t; save(); } return render(); }
-  if (a === "unswitch") { if (confirm("Revenir en mode reprise ? Le plan Raid sera recalculé au prochain passage.")) { DB.profile.switchDate = null; save(); } return render(); }
-  if (a === "ivtest") {
-    DB.profile.intervalsId = document.getElementById("ivId").value.trim();
-    DB.profile.intervalsKey = document.getElementById("ivKey").value.trim(); save();
-    if (!ivReady()) { UI.msg.iv = { t: "err", m: "Renseigne les deux champs." }; return render(); }
-    UI.msg.iv = { t: "", m: "Test en cours…" }; render();
-    ivFetch("").then(function (ath) { UI.msg.iv = { t: "ok", m: "Connecté à Intervals.icu" + (ath && ath.name ? " : " + ath.name : "") + "." }; render(); })
-      .catch(function (e) { UI.msg.iv = { t: "err", m: ivError(e) }; render(); });
-    return;
-  }
-  if (a === "export") {
-    var txt = JSON.stringify(Object.assign({}, DB, { profile: Object.assign({}, DB.profile, { intervalsKey: "" }) }));
-    var ok = function () { UI.msg.bk = { t: "ok", m: "Sauvegarde copiée (sans ta clé API)." }; render(); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function () { prompt("Copie ce texte :", txt); }); else prompt("Copie ce texte :", txt);
-    return;
-  }
-  if (a === "import") { UI.showImport = true; return render(); }
-  if (a === "doimport") {
-    try { var x = JSON.parse(document.getElementById("bkText").value); if (!x.profile || !Array.isArray(x.logs)) throw 0; var key = DB.profile.intervalsKey; DB = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), x); DB.profile = Object.assign({}, DEFAULT.profile, x.profile, { intervalsKey: x.profile.intervalsKey || key }); save(); UI.showImport = false; UI.msg.bk = { t: "ok", m: "Sauvegarde importée." }; }
-    catch (e) { UI.msg.bk = { t: "err", m: "Ce texte n'est pas une sauvegarde NaqRun valide." }; }
-    return render();
-  }
-});
-
 function readDraft() {
   var d = UI.draft; if (!d) return;
   var el = function (id) { return document.getElementById(id); };
   if (el("dDate")) d.date = el("dDate").value;
   if (el("dTitle")) d.title = el("dTitle").value;
   if (el("dNote")) d.note = el("dNote").value;
+  if (el("dKind")) d.kind = el("dKind").value;
 }
+function readRace() {
+  var r = UI.raceDraft; if (!r) return;
+  document.querySelectorAll("[data-race]").forEach(function (el) {
+    var k = el.dataset.race;
+    if (el.type === "checkbox") r[k] = el.checked;
+    else if (el.type === "number") r[k] = el.value === "" ? (k === "cutoffH" ? null : 0) : +el.value;
+    else r[k] = el.value;
+  });
+}
+
+document.addEventListener("click", function (ev) {
+  var b = ev.target.closest("[data-act],[data-tab]"); if (!b) return;
+  if (b.closest("nav.tabs")) { go(b.dataset.tab); return; }
+  var a = b.dataset.act, t = today(), p = DB.profile;
+  if (a === "tab") return go(b.dataset.tab);
+  if (a === "settings") return go("settings");
+  if (a === "welcome") { p._welcomed = true; save(); return render(); }
+  if (a === "send") return sendSession(b.dataset.key);
+  if (a === "copy") return copySession(b.dataset.key);
+  if (a === "tolog") { var x = SESSIONS[b.dataset.key]; UI.draft = null; go("journal"); if (x && UI.draft) { UI.draft.kind = x.kind; UI.draft.title = x.title; UI.draft.date = x.date <= t ? x.date : t; render(); } return; }
+  if (a === "clearstop") { p.clearedStop = t; save(); return render(); }
+  if (a === "morning") { var l = DB.logs.find(function (x) { return x.id === b.dataset.id; }); if (l) { l.morning = +document.getElementById("morningQuick").value; save(); } return render(); }
+  if (a === "addmorning") { var l2 = DB.logs.find(function (x) { return x.id === b.dataset.id; }); var val = prompt("Douleur au tibia au réveil, de 0 à 10 :", "0"); if (l2 && val != null && val !== "" && !isNaN(+val)) { l2.morning = Math.max(0, Math.min(10, Math.round(+val))); save(); } return render(); }
+  if (a === "dellog") { if (confirm("Supprimer cette séance du journal ?")) { DB.logs = DB.logs.filter(function (x) { return x.id !== b.dataset.id; }); save(); } return render(); }
+  if (a === "savelog") {
+    readDraft(); var d = UI.draft;
+    if (!d.date || d.date > t) { alert("Choisis une date passée ou aujourd'hui."); return; }
+    DB.logs.push(Object.assign({}, d, { id: String(Date.now()), title: d.title || KINDS[d.kind] })); save(); UI.draft = null; UI.msg.act = null;
+    return go("today");
+  }
+  if (a === "fetchact") {
+    readDraft(); var dd = UI.draft.date; UI.msg.act = { t: "", m: "Recherche de la sortie…" }; render();
+    ivFetch("/activities?oldest=" + dd + "&newest=" + dd).then(function (list) {
+      var runs = (list || []).filter(function (x) { return /Run|Hike|Walk/.test(x.type || ""); });
+      if (!runs.length) { UI.msg.act = { t: "err", m: "Aucune sortie trouvée ce jour-là dans Intervals.icu (la synchro Garmin peut prendre quelques minutes)." }; return render(); }
+      var r = runs[0], sec = r.moving_time || r.elapsed_time || 0, cad = r.average_cadence ? Math.round(r.average_cadence < 120 ? r.average_cadence * 2 : r.average_cadence) : null;
+      UI.draft.activity = { km: ((r.distance || 0) / 1000).toFixed(2).replace(".", ","), time: Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"), hr: r.average_heartrate ? Math.round(r.average_heartrate) : null, cad: cad, name: r.name || "" };
+      UI.msg.act = { t: "ok", m: "Sortie récupérée : " + (r.name || "course") + "." }; render();
+    }).catch(function (e) { UI.msg.act = { t: "err", m: ivError(e) }; render(); });
+    return;
+  }
+  if (a === "switch") { if (confirm("Passer au programme ultra à partir d'aujourd'hui ?")) { p.switchDate = t; save(); } return render(); }
+  if (a === "unswitch") { if (confirm("Revenir en mode reprise ?")) { p.switchDate = null; save(); } return render(); }
+  if (a === "saverace") {
+    readRace(); var r = UI.raceDraft;
+    if (!r.date || !(r.km > 0) || r.dplus < 0) { UI.msg.race = { t: "err", m: "Renseigne au moins la date, la distance et le D+." }; return render(); }
+    if (r.date <= t) { UI.msg.race = { t: "err", m: "La date de la course doit être dans le futur." }; return render(); }
+    r.stages = Math.max(1, Math.round(r.stages || 1));
+    p.race = Object.assign({}, r); save(); UI.msg.race = { t: "ok", m: "Course enregistrée." }; return render();
+  }
+  if (a === "delrace") { if (confirm("Retirer cette course ?")) { p.race = null; UI.raceDraft = null; save(); } return render(); }
+  if (a === "ivtest") {
+    p.intervalsId = document.getElementById("ivId").value.trim(); p.intervalsKey = document.getElementById("ivKey").value.trim(); save();
+    if (!ivReady()) { UI.msg.iv = { t: "err", m: "Renseigne les deux champs." }; return render(); }
+    UI.msg.iv = { t: "", m: "Test en cours…" }; render();
+    ivFetch("").then(function (ath) { UI.msg.iv = { t: "ok", m: "Connecté à Intervals.icu" + (ath && ath.name ? " : " + ath.name : "") + "." }; render(); }).catch(function (e) { UI.msg.iv = { t: "err", m: ivError(e) }; render(); });
+    return;
+  }
+  if (a === "export") {
+    var txt = JSON.stringify(Object.assign({}, DB, { profile: Object.assign({}, p, { intervalsKey: "" }) }));
+    var ok = function () { UI.msg.bk = { t: "ok", m: "Sauvegarde copiée (sans ta clé API)." }; render(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function () { prompt("Copie ce texte :", txt); }); else prompt("Copie ce texte :", txt);
+    return;
+  }
+  if (a === "import") { UI.showImport = true; return render(); }
+  if (a === "doimport") {
+    try { var x2 = JSON.parse(document.getElementById("bkText").value); if (!x2.profile || !Array.isArray(x2.logs)) throw 0; var key = p.intervalsKey; DB = { profile: Object.assign({}, DEFAULT.profile, x2.profile), logs: x2.logs, sent: x2.sent || {} }; DB.profile.ref = Object.assign({}, DEFAULT.profile.ref, x2.profile.ref || {}); if (!DB.profile.intervalsKey) DB.profile.intervalsKey = key; save(); UI.showImport = false; UI.msg.bk = { t: "ok", m: "Sauvegarde importée." }; }
+    catch (e) { UI.msg.bk = { t: "err", m: "Ce texte n'est pas une sauvegarde NaqRun valide." }; }
+    return render();
+  }
+});
 
 document.addEventListener("input", function (ev) {
   var t = ev.target;
   if (t.id === "morningQuick") { document.getElementById("mv").textContent = t.value + "/10"; return; }
-  if (t.dataset.pain && UI.draft) { UI.draft[t.dataset.pain] = +t.value; document.getElementById("o-" + t.dataset.pain).textContent = t.value + "/10"; refreshVerdict(); return; }
+  if (t.dataset.pain && UI.draft) { UI.draft[t.dataset.pain] = +t.value; document.getElementById("o-" + t.dataset.pain).textContent = t.value + "/10"; refreshVerdict(); }
 });
 document.addEventListener("change", function (ev) {
   var t = ev.target, p = DB.profile;
   if (t.id === "mLater") { readDraft(); UI.draft.morning = t.checked ? null : 0; return render(); }
   if (t.id === "dInc") { UI.draft.increasing = t.checked; return refreshVerdict(); }
+  if (t.id === "dKind") { readDraft(); return refreshVerdict(); }
   if (t.dataset.flag != null && UI.draft) { UI.draft.flags[+t.dataset.flag] = t.checked; return refreshVerdict(); }
   if (t.dataset.pass) { p[t.dataset.pass] = t.checked; save(); return render(); }
   if (t.dataset.gate) { p.gates[t.dataset.gate] = t.checked; save(); return render(); }
-  if (t.dataset.renfo != null) { var d = today(); DB.renfo[d] = DB.renfo[d] || []; DB.renfo[d][+t.dataset.renfo] = t.checked; save(); return render(); }
+  if (t.dataset.race) { readRace(); var s2 = S(), box = document.getElementById("raceAnalysis"); if (box) box.innerHTML = raceAnalysis(UI.raceDraft, s2, s2.mode === "ultra" ? (s2.ultraStart || today()) : E.estimateOptimal(DB.profile, s2, today())); return; }
   if (t.id === "startLevel") { p.startLevel = +t.value; save(); return; }
-  if (t.id === "raceDate" && t.value) { p.raceDate = t.value; save(); return; }
-  if (t.id === "raceConfirmed") { p.raceConfirmed = t.checked; save(); return; }
-  if (t.id === "peakHours") { p.peakHours = Math.max(6, Math.min(16, +t.value || 10)); save(); return; }
+  if (t.id === "hoursMax") { p.hoursMax = Math.max(5, Math.min(16, +t.value || 10)); save(); return; }
+  if (t.id === "refKm" || t.id === "refDp" || t.id === "refH") { var k = { refKm: "km", refDp: "dplus", refH: "hours" }[t.id]; if (+t.value > 0) { p.ref[k] = +t.value; save(); } return; }
   if (t.id === "dDate" || t.id === "dTitle" || t.id === "dNote") { readDraft(); return; }
 });
 function refreshVerdict() { readDraft(); var b = document.getElementById("verdictBox"); if (b && UI.draft) b.innerHTML = verdictHtml(UI.draft); }
