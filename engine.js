@@ -264,16 +264,26 @@
   }
 
   // ---------- Séances d'une date ----------
+  // profile.moves : { "AAAA-MM-JJ|type": "AAAA-MM-JJ" (reportée) ou "skip" (annulée) }
+  function sessionKey(x) { return (x.origDate || x.date) + "|" + x.kind; }
+  function rawSessions(profile, state, from, to, race) {
+    var out = [];
+    if (state.mode === "reprise") {
+      for (var m = mondayOf(from); m <= to; m = addDays(m, 7)) out = out.concat(repriseWeek(profile, state, m));
+    } else if (race) {
+      buildProgram(profile, state, race).weeks.forEach(function (w) { w.sessions.forEach(function (x) { out.push(Object.assign({ week: w }, x)); }); });
+    }
+    return out;
+  }
   function sessionsOn(profile, state, date, race) {
     if (state.stopped) return [];
-    if (state.mode === "reprise") {
-      var wk = repriseWeek(profile, state, mondayOf(date)).filter(function (x) { return x.date === date; });
-      if (state.restUntil && date <= state.restUntil) wk = wk.filter(function (x) { return x.kind === "velo"; });
-      return wk;
-    }
-    if (!race) return [];
-    var p = buildProgram(profile, state, race), out = [];
-    p.weeks.forEach(function (w) { w.sessions.forEach(function (x) { if (x.date === date) out.push(Object.assign({ week: w }, x)); }); });
+    if (state.mode === "ultra" && !race) return [];
+    var moves = profile.moves || {};
+    var out = rawSessions(profile, state, addDays(date, -14), addDays(date, 14), race).map(function (x) {
+      var mv = moves[x.date + "|" + x.kind];
+      if (mv === "skip") return null;
+      return mv ? Object.assign({}, x, { origDate: x.date, date: mv }) : x;
+    }).filter(function (x) { return x && x.date === date; });
     if (state.restUntil && date <= state.restUntil) out = out.filter(function (x) { return x.kind === "velo"; });
     return out;
   }
@@ -364,7 +374,7 @@
   }
 
   var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, LADDER_V1: LADDER_V1, isConsolidation: isConsolidation, PHASES: PHASES, verdict: verdict, verdictInContext: verdictInContext, computeState: computeState, passage: passage,
-    repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, weekSessions: weekSessions,
+    repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, sessionKey: sessionKey, weekSessions: weekSessions,
     totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal, prepStart: prepStart,
     addDays: addDays, diffDays: diffDays, todayStr: todayStr, longDate: longDate, monthYear: monthYear, mondayOf: mondayOf, weekday: weekday };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Engine = api;

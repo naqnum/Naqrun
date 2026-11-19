@@ -97,4 +97,11 @@ assert.equal(s.logs[2]._v, 'orange'); assert.equal(s.level, 8); assert.equal(s.s
 // en programme : un jaune n'allège pas la semaine, deux de suite oui
 s = E.computeState(p2, [j('2027-02-20')], '2027-02-21'); assert.equal(Object.keys(s.reduce).length, 0);
 s = E.computeState(p2, [j('2027-02-20'), j('2027-02-23')], '2027-02-24'); assert.equal(Object.keys(s.reduce).length, 1);
+// Report et annulation de séance
+s = E.computeState(prof, [], '2026-11-23');
+const mp = { ...prof, moves: { '2026-11-24|palier': '2026-11-25', '2026-11-26|cadence': 'skip' } };
+assert.equal(E.sessionsOn(mp, s, '2026-11-24', null).length, 0);
+assert.equal(E.sessionsOn(mp, s, '2026-11-25', null)[0].kind, 'palier');
+assert.equal(E.sessionsOn(mp, s, '2026-11-25', null)[0].origDate, '2026-11-24');
+assert.equal(E.sessionsOn(mp, s, '2026-11-26', null).length, 0);
 console.log('OK');

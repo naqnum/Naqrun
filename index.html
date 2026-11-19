@@ -90,6 +90,31 @@ nav.tabs button[aria-current=page]::before{background:var(--accent)}
 .iconbtn{min-height:44px;min-width:44px;padding:0;border:none}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 details summary{cursor:pointer;font-size:14px;font-weight:600;min-height:32px;display:flex;align-items:center}
+details.sessd{border-bottom:1px solid var(--border)}details.sessd:last-child{border-bottom:none}
+details.sessd summary{list-style:none;padding:8px 0}details.sessd summary::-webkit-details-marker{display:none}
+.chev{font-size:22px;color:var(--muted);transition:transform .2s;flex:none}details.sessd[open] .chev{transform:rotate(90deg)}
+.sessbody{display:flex;flex-direction:column;gap:10px;padding:4px 0 14px}
+/* Petits écrans (iPhone 12 mini : 375 px, iPhone SE : 320 px) */
+html,body{overflow-x:hidden}
+main,.card,.week,.log{min-width:0;max-width:100%}
+.row>*,.btns>*,.hdr>*,.sess>*,.field,.stat{min-width:0}
+.sess>span{flex:1;overflow-wrap:anywhere}.sess>button,.sess>.chev{flex:none}
+p,span,summary,.notice,label{overflow-wrap:anywhere}
+input,select,textarea{max-width:100%;min-width:0;box-sizing:border-box}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-height:44px;text-align:left}
+select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px;text-overflow:ellipsis}
+.hdr{flex-wrap:wrap}
+@media (max-width:400px){
+  main{padding-left:12px;padding-right:12px;gap:12px}
+  .card{padding:14px}
+  h1{font-size:25px}
+  .hero b{font-size:60px}
+  .grid4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .btns.wrap>*{flex:1 1 100%}
+  nav.tabs{padding:0 2px var(--safe-b)}
+  nav.tabs button{font-size:11px;padding:0 2px;min-width:0}
+}
+@media (max-width:340px){ .btns>*{flex:1 1 100%} .hero b{font-size:52px} }
 </style>
 </head>
 <body>
@@ -206,14 +231,21 @@ function sessionCard(sess, key, label) {
     stepsHtml(sess.blocks) + (sess.note ? '<div class="notice">' + esc(sess.note) + "</div>" : "") +
     (sess.kind !== "velo" ? '<p class="muted">Pendant la course : au-delà de 3/10, ralentis ou marche. Au-delà de 5/10, ou si la douleur augmente, arrête et rentre en marchant.</p>' : "") +
     '<button class="primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix 7X</button>" + msgHtml(key) +
-    (sess.kind !== "velo" ? '<button data-act="tolog" data-key="' + key + '">J\'ai fait la séance : remplir le journal</button>' : "") + "</section>";
+    (sess.kind !== "velo" ? '<button data-act="tolog" data-key="' + key + '">J\'ai fait la séance : remplir le journal</button>' : "") + moveHtml(sess, key) + "</section>";
 }
 function weekList(sessions, prefix) {
   if (!sessions.length) return '<p class="muted">Aucune séance prévue.</p>';
   return sessions.map(function (x, j) {
     var key = prefix + j; SESSIONS[key] = x;
-    return '<div class="sess"><span>' + esc(cap(E.longDate(x.date))) + '<br><span class="muted">' + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><button class="small" data-act="send" data-key="' + key + '">Envoyer</button></div>' + msgHtml(key);
+    var open = UI.open === key;
+    return '<details class="sessd" data-key="' + key + '"' + (open ? " open" : "") + '><summary class="sess"><span>' + esc(cap(E.longDate(x.date))) + (x.origDate ? " (reportée)" : "") + '<br><span class="muted">' + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><span class="chev" aria-hidden="true">›</span></summary>' +
+      '<div class="sessbody"><span class="chip soft" style="align-self:flex-start">' + esc(KINDS[x.kind] || x.kind) + "</span>" + stepsHtml(x.blocks) + (x.note ? '<div class="notice">' + esc(x.note) + "</div>" : "") +
+      '<button class="small primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix</button>" + msgHtml(key) + moveHtml(x, key) + "</div></details>";
   }).join("");
+}
+function moveHtml(x, key) {
+  var t = today(); if (x.date < t) return "";
+  return '<div class="btns"><button class="small" data-act="move" data-key="' + key + '" data-days="1">Reporter à demain</button><button class="small" data-act="skip" data-key="' + key + '">Annuler</button></div>' + (x.origDate ? '<button class="small" data-act="unmove" data-key="' + key + '">Remettre au ' + esc(E.longDate(x.origDate)) + "</button>" : "");
 }
 
 // ---------- Vues ----------
@@ -461,6 +493,21 @@ document.addEventListener("click", function (ev) {
     }).catch(function (e) { UI.msg.act = { t: "err", m: ivError(e) }; render(); });
     return;
   }
+  if (a === "move" || a === "skip" || a === "unmove") {
+    var sx = SESSIONS[b.dataset.key]; if (!sx) return;
+    p.moves = p.moves || {};
+    var k = (sx.origDate || sx.date) + "|" + sx.kind;
+    if (a === "move") {
+      var nd = E.addDays(sx.date, +b.dataset.days || 1);
+      var runs = function (d) { return E.sessionsOn(p, S(), d, p.race).filter(function (y) { return y.kind !== "velo" && !(y.date === sx.date && y.kind === sx.kind); }).length; };
+      if (sx.kind !== "velo" && (runs(nd) || runs(E.addDays(nd, -1)) || runs(E.addDays(nd, 1))) && !confirm("Une autre course est prévue la veille, le jour même ou le lendemain. Pour le tibia, mieux vaut un jour sans course entre deux sorties. Reporter quand même ?")) return;
+      p.moves[k] = nd;
+    } else if (a === "skip") {
+      if (!confirm("Annuler cette séance ? Elle ne sera pas rattrapée : la progression attend simplement la prochaine séance.")) return;
+      p.moves[k] = "skip";
+    } else delete p.moves[k];
+    save(); return render();
+  }
   if (a === "rythme") { p.rythme = b.dataset.v; save(); return render(); }
   if (a === "switch") { if (confirm("Passer au programme ultra à partir d'aujourd'hui ?")) { p.switchDate = t; save(); } return render(); }
   if (a === "unswitch") { if (confirm("Revenir en mode reprise ?")) { p.switchDate = null; save(); } return render(); }
@@ -493,6 +540,7 @@ document.addEventListener("click", function (ev) {
   }
 });
 
+document.addEventListener("toggle", function (ev) { var d = ev.target; if (d.classList && d.classList.contains("sessd")) { if (d.open) UI.open = d.dataset.key; else if (UI.open === d.dataset.key) UI.open = null; } }, true);
 document.addEventListener("input", function (ev) {
   var t = ev.target;
   if (t.id === "morningQuick") { document.getElementById("mv").textContent = t.value + "/10"; return; }
