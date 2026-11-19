@@ -27,22 +27,25 @@
   var RELIEF = "Pentes douces seulement (moins de 6 %). Montées raides et descentes : en marchant.";
   // Chaque marche ≤ 10 % de la plus longue course récente (étude Garmin-RUNSAFE, BJSM 2025)
   function lvC(n, phase, run, label, note) { return { n: n, phase: phase, title: (phase >= 4 ? "Trail " + run + " min" : run + " min " + (phase === 3 ? "vallonné doux" : "continu")), run: run, blocks: cont(run, label), note: note }; }
+  function frac(n, reps, block, walk) {
+    return { n: n, phase: 0, title: reps + " × " + block + " min (" + walk + " min de marche entre)", run: reps * block, block: block,
+      blocks: [W5, { rep: reps, steps: [{ k: "course", min: block, label: "Course facile" }, { k: "marche", min: walk, label: "Marche" }] }, C5] };
+  }
   var LEVELS = [
-    { n: 1, phase: 0, title: "5 × (4 min course / 1 min marche)", run: 20, blocks: [W5, { rep: 5, steps: [{ k: "course", min: 4 }, { k: "marche", min: 1 }] }, C5] },
-    { n: 2, phase: 0, title: "4 × (5 min 30 course / 1 min marche)", run: 22, blocks: [W5, { rep: 4, steps: [{ k: "course", min: 5.5 }, { k: "marche", min: 1 }] }, C5] },
-    { n: 3, phase: 0, title: "3 × (8 min course / 1 min marche)", run: 24, blocks: [W5, { rep: 3, steps: [{ k: "course", min: 8 }, { k: "marche", min: 1 }] }, C5] },
-    lvC(4, 1, 27), lvC(5, 1, 30), lvC(6, 1, 33), lvC(7, 1, 36), lvC(8, 1, 40), lvC(9, 1, 44), lvC(10, 1, 48),
-    lvC(11, 2, 53), lvC(12, 2, 58),
-    lvC(13, 3, 64, "Course facile, vallonné doux", RELIEF), lvC(14, 3, 70, "Course facile, vallonné doux", RELIEF),
-    lvC(15, 4, 77, "Trail facile", "Montées raides marchées, descentes marchées."),
-    lvC(16, 4, 85, "Trail facile", "Montées raides marchées, descentes douces courues."),
-    lvC(17, 4, 90, "Trail facile", "Montées raides marchées, descentes courues sans freiner fort."),
+    frac(1, 4, 5, 2), frac(2, 2, 11, 2), frac(3, 2, 12, 2), frac(4, 2, 13, 2), frac(5, 2, 14, 2),
+    frac(6, 2, 15, 2), frac(7, 2, 16, 2), frac(8, 2, 17, 2), frac(9, 2, 18, 2),
+    lvC(10, 1, 40), lvC(11, 1, 44), lvC(12, 1, 48),
+    lvC(13, 2, 53), lvC(14, 2, 58),
+    lvC(15, 3, 64, "Course facile, vallonné doux", RELIEF), lvC(16, 3, 70, "Course facile, vallonné doux", RELIEF),
+    lvC(17, 4, 77, "Trail facile", "Montées raides marchées, descentes marchées."),
+    lvC(18, 4, 85, "Trail facile", "Montées raides marchées, descentes douces courues."),
+    lvC(19, 4, 90, "Trail facile", "Montées raides marchées, descentes courues sans freiner fort."),
   ];
-  var RELIEF_LEVEL = 13, RETURN_LEVEL = 12; // 64 min vallonné ; retour à 58 min continu après un rouge en programme
+  var RELIEF_LEVEL = 15, RETURN_LEVEL = 14; // 64 min vallonné ; retour à 58 min continu après un rouge en programme
   // Ancienne échelle (v1/v2, 15 paliers) → nouvelle
-  var LADDER_V1 = [0, 1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+  var LADDER_V1 = [0, 1, 2, 3, 6, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
   var MAX_LEVEL = LEVELS.length;
-  var PHASES = ["Repli course/marche", "Continu sur le plat", "Volume", "Relief doux", "Trail"];
+  var PHASES = ["Course fractionnée", "Continu sur le plat", "Volume", "Relief doux", "Trail"];
   var CADENCE = "Cadence visée : 165 à 170 pas/min (alerte cadence sur la Fenix).";
 
   // ---------- Verdict d'une séance de course ----------
@@ -148,9 +151,11 @@
     var consNote = cons ? "Semaine de consolidation : volume réduit, pas de montée de palier. " : "";
     var out = [
       sess(d(1), "palier", lv.title, lv.blocks, { level: lv.n, phase: PHASES[lv.phase], note: consNote + [lv.note, CADENCE].filter(Boolean).join(" "), key: true, consolidation: cons }),
-      sess(d(3), "cadence", "Footing cadence", [W5, { k: "course", min: Math.max(10, cad - 9) , label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: "Pas plus vite : seulement des pas plus courts et plus rapides." }),
-      sess(d(4), "velo", "Vélo ou elliptique", bike(clamp(45 + 5 * (lv.n - 8), 40, 90) * f), { note: "Endurance sans impact pour le tibia." }),
-      sess(d(5), "rando", "Rando-course", rando(clamp(50 + 5 * lv.n, 60, 150) * f, Math.min(25, Math.round(lv.run * 0.3))), { note: "Terrain souple. Montées raides et descentes en marchant." }),
+      lv.phase === 0
+        ? sess(d(3), "cadence", "Footing cadence", [W5, { rep: 2, steps: [{ k: "course", min: Math.max(4, Math.round(lv.block * 0.6 * f)), label: "Course facile" }, { k: "marche", min: 2, label: "Marche" }] }, { rep: 4, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." })
+        : sess(d(3), "cadence", "Footing cadence", [W5, { k: "course", min: Math.max(10, cad - 9) , label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." }),
+      sess(d(4), "velo", "Vélo ou elliptique", bike(clamp(45 + 5 * (lv.n - 10), 40, 90) * f), { note: "Endurance sans impact pour le tibia." }),
+      sess(d(5), "rando", "Rando-course", rando(clamp(50 + 5 * lv.n, 60, 150) * f, Math.min(25, Math.round(lv.run * 0.3), lv.block || 99)), { note: "Terrain souple. Montées raides et descentes en marchant." }),
     ];
     return out;
   }

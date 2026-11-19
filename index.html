@@ -132,7 +132,7 @@ select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:
 "use strict";
 var E = window.Engine;
 var KEY = "naqrun.v1";
-var DEFAULT = { profile: { startLevel: 8, ladderV: 2, cycleStart: null, switchDate: null, hop: false, heel: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "", hoursMax: 10, h0: 4.5, ref: { km: 29.6, dplus: 637, hours: 3.45 }, race: null }, logs: [], sent: {} };
+var DEFAULT = { profile: { startLevel: 5, ladderV: 3, cycleStart: null, switchDate: null, hop: false, heel: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "", hoursMax: 10, h0: 4.5, ref: { km: 29.6, dplus: 637, hours: 3.45 }, race: null }, logs: [], sent: {} };
 var RACE_EXAMPLE = { name: "Raid de l'Archange", date: "2027-06-17", km: 280, dplus: 3000, stages: 3, autonomy: true, terrain: "roulant", night: false, cutoffH: null, confirmed: false };
 var KINDS = { palier: "Footing palier", cadence: "Footing cadence", rando: "Rando-course", footing: "Footing", longue: "Sortie longue", cote: "Montées sur la côte", velo: "Vélo / elliptique", autre: "Autre course" };
 
@@ -142,7 +142,7 @@ function load() {
     if (x && x.profile) {
       var p = Object.assign({}, DEFAULT.profile, x.profile);
       p.ref = Object.assign({}, DEFAULT.profile.ref, x.profile.ref || {});
-      if (p.ladderV !== 2) { p.startLevel = E.LADDER_V1[p.startLevel] || 8; p.ladderV = 2; } // nouvelle échelle de paliers
+      if (p.ladderV !== 3) { p.startLevel = 5; p.ladderV = 3; } // échelle v3 : départ à 2 × 14 min (niveau actuel de Nour)
       return { profile: p, logs: x.logs || [], sent: x.sent || {} };
     }
   } catch (e) {}
@@ -256,7 +256,7 @@ function vToday() {
   var s = S(), t = today(), p = DB.profile, h = "";
   h += '<header class="hdr"><div><p class="muted">' + esc(cap(E.longDate(t))) + '</p><h1>Aujourd\'hui</h1></div><div style="display:flex;gap:6px;align-items:center"><span class="chip soft">' + (s.mode === "ultra" ? "Programme" : "Reprise") + "</span>" + GEAR + "</div></header>";
   if (!saveOk) h += '<div class="notice err">Le stockage du téléphone est indisponible : tes saisies ne seront pas gardées.</div>';
-  if (!DB.logs.length && !p._welcomed) h += '<section class="card"><h2>Bienvenue sur NaqRun</h2><p class="muted">Tu démarres au palier ' + p.startLevel + " (" + esc(E.LEVELS[p.startLevel - 1].title) + '), d\'après tes dernières sorties. Relie Intervals.icu dans les réglages pour envoyer les séances sur ta Fenix.</p><div class="btns"><button class="small" data-act="settings">Réglages</button><button class="small" data-act="welcome">Compris</button></div></section>';
+  if (!DB.logs.length && !p._welcomed) h += '<section class="card"><h2>Bienvenue sur NaqRun</h2><p class="muted">Tu démarres au palier ' + p.startLevel + " (" + esc(E.LEVELS[p.startLevel - 1].title) + '). Relie Intervals.icu dans les réglages pour envoyer les séances sur ta Fenix.</p><div class="btns"><button class="small" data-act="settings">Réglages</button><button class="small" data-act="welcome">Compris</button></div></section>';
   if (s.stopped) h += '<section class="card" style="border-color:var(--r)"><div class="row"><h2>Arrêt</h2>' + chip("stop") + '</div><p>Tu as signalé un signe d\'arrêt (douleur précise sur l\'os, douleur au repos ou boiterie). Arrête la course et demande un avis médical : ce sont des signes possibles de fracture de fatigue.</p><button data-act="clearstop">J\'ai eu le feu vert médical</button></section>';
   var pending = s.logs.filter(function (l) { return l.morning == null && l.date < t; }).pop();
   if (pending) h += '<section class="card"><div class="row"><h2>Note du matin</h2><span class="muted">' + esc(E.longDate(pending.date)) + '</span></div><label class="field"><span class="row">Douleur au tibia au réveil <span class="val" id="mv">0/10</span></span><input type="range" min="0" max="10" value="0" id="morningQuick"></label><button class="primary" data-act="morning" data-id="' + pending.id + '">Valider la note</button></section>';
@@ -430,8 +430,9 @@ function vSettings() {
     '<label class="field">Clé API<input type="password" id="ivKey" value="' + esc(p.intervalsKey) + '" autocomplete="off"></label>' +
     '<button class="small" data-act="ivtest">Enregistrer et tester la connexion</button>' + (UI.msg.iv ? '<div class="notice ' + UI.msg.iv.t + '">' + esc(UI.msg.iv.m) + "</div>" : "") + "</section>";
   h += '<section class="card"><h2>Reprise</h2><label class="field">Palier de départ<select id="startLevel">' + E.LEVELS.map(function (lv) { return '<option value="' + lv.n + '"' + (lv.n === p.startLevel ? " selected" : "") + ">" + lv.n + " · " + esc(lv.title) + "</option>"; }).join("") + "</select></label>" + (p.switchDate ? '<button class="small" data-act="unswitch">Revenir en mode reprise</button>' : "") + "</section>";
-  h += '<section class="card"><h2>Programme</h2><label class="field">Heures maximum par semaine<input type="number" id="hoursMax" min="5" max="16" step="0.5" value="' + p.hoursMax + '"></label>' +
-    '<p class="muted">Course de référence pour estimer les durées (par défaut ton trail de Fermanville sur Strava).</p><div class="btns"><label class="field">km<input type="number" inputmode="decimal" id="refKm" value="' + p.ref.km + '"></label><label class="field">D+ (m)<input type="number" inputmode="numeric" id="refDp" value="' + p.ref.dplus + '"></label><label class="field">Durée (h)<input type="number" inputmode="decimal" step="0.05" id="refH" value="' + p.ref.hours + '"></label></div></section>';
+  if (S().mode === "ultra") h += '<section class="card"><h2>Programme ultra</h2><label class="field">Heures maximum par semaine<input type="number" id="hoursMax" min="5" max="16" step="0.5" value="' + p.hoursMax + '"></label><p class="muted">Le temps d\'entraînement que tu peux consacrer au pic de ta préparation (course, rando et vélo compris). Le programme monte progressivement jusqu\'à ce plafond sans jamais le dépasser, même si la course en demanderait plus.</p></section>';
+  h += '<section class="card"><h2>Estimation des durées</h2>' +
+    '<p class="muted">Course de référence pour estimer tes temps de course (par défaut ton trail de Fermanville sur Strava).</p><div class="btns"><label class="field">km<input type="number" inputmode="decimal" id="refKm" value="' + p.ref.km + '"></label><label class="field">D+ (m)<input type="number" inputmode="numeric" id="refDp" value="' + p.ref.dplus + '"></label><label class="field">Durée (h)<input type="number" inputmode="decimal" step="0.05" id="refH" value="' + p.ref.hours + '"></label></div></section>';
   h += '<section class="card"><h2>Sauvegarde</h2><p class="muted">Tes données sont sur ce téléphone. Copie la sauvegarde de temps en temps (dans Notes, par exemple).</p><div class="btns"><button class="small" data-act="export">Copier la sauvegarde</button><button class="small" data-act="import">Coller une sauvegarde</button></div>' + (UI.msg.bk ? '<div class="notice ' + UI.msg.bk.t + '">' + esc(UI.msg.bk.m) + "</div>" : "") + (UI.showImport ? '<textarea id="bkText" placeholder="Colle ta sauvegarde ici"></textarea><button class="small" data-act="doimport">Importer</button>' : "") + "</section>";
   h += '<section class="card"><p class="muted">NaqRun ne remplace pas un avis médical. Si ton kiné t\'a donné d\'autres consignes, elles priment.</p></section>';
   return h;

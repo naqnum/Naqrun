@@ -2,19 +2,19 @@
 const E = require('../engine.js');
 const assert = require('assert');
 const ref = { km: 29.6, dplus: 637, hours: 3.45 }; // trail de Fermanville, Strava
-const prof = { startLevel: 8, ref, hoursMax: 10 };
+const prof = { startLevel: 10, ref, hoursMax: 10 }; // 40 min continu
 const g = (d, kind) => ({ date: d, kind: kind || 'palier', during: 1, after: 1, morning: 0, increasing: false, flags: [false, false, false] });
 
 // Progression : 2 vertes « palier » → palier suivant ; les autres séances ne font pas monter
 let s = E.computeState(prof, [g('2026-11-24'), g('2026-11-26', 'cadence'), g('2026-12-01')], '2026-12-02');
-assert.equal(s.level, 9);
+assert.equal(s.level, 11);
 // Rouge → recul de 2 et repos 48 h
 s = E.computeState(prof, [g('2026-11-24'), { ...g('2026-11-26'), during: 7 }], '2026-11-27');
-assert.equal(s.level, 6); assert.equal(s.resting, true);
+assert.equal(s.level, 8); assert.equal(s.resting, true);
 assert.ok(E.sessionsOn(prof, s, '2026-11-28', null).every(x => x.kind === 'velo'));
 // Orange : même palier, série remise à zéro
 s = E.computeState(prof, [g('2026-11-24'), { ...g('2026-11-26'), after: 4 }], '2026-11-27');
-assert.equal(s.level, 8); assert.equal(s.streak, 0);
+assert.equal(s.level, 10); assert.equal(s.streak, 0);
 // Signe d'arrêt
 s = E.computeState(prof, [{ ...g('2026-11-24'), flags: [true, false, false] }], '2026-11-25');
 assert.equal(s.stopped, true); assert.equal(E.sessionsOn(prof, s, '2026-11-26', null).length, 0);
@@ -22,6 +22,10 @@ assert.equal(s.stopped, true); assert.equal(E.sessionsOn(prof, s, '2026-11-26', 
 s = E.computeState(prof, [], '2026-11-23');
 const wk = E.repriseWeek(prof, s, '2026-11-23');
 assert.deepEqual(wk.map(x => x.kind), ['palier', 'cadence', 'velo', 'rando']);
+// Au palier 2 × 14 : aucune course continue plus longue qu'un bloc
+const w5 = E.repriseWeek({ ...prof, startLevel: 5 }, { level: 5 }, '2026-11-23');
+w5.forEach(x => x.blocks.forEach(b => (b.rep ? b.steps : [b]).forEach(st => { if (st.k === 'course') assert.ok(st.min <= 14, x.title + ' ' + st.min); })));
+console.log(w5.map(x => x.title + ' ' + E.totalMin(x.blocks) + ' min').join(' | '));
 assert.equal(E.intervalsEvent(wk[2]).type, 'Ride');
 console.log(wk.map(x => x.date.slice(5) + ' ' + x.title + ' ' + E.totalMin(x.blocks) + ' min').join(' | '));
 assert.ok(!/\d/.test(E.intervalsText(wk[0].blocks).split('\n').map(l => l.replace(/\d+m|\d+s|Z\d|\d+x/g, '')).join('')), 'pas de chiffres dans les libellés');
@@ -47,7 +51,7 @@ const P3 = E.buildProgram(p2, s, raid);
 console.log('raid chocs', P3.weeks.filter(w => w.choc).map(w => w.monday + ' ' + w.sessions.filter(x=>x.kind==='longue').map(x=>Math.round(E.totalMin(x.blocks))).join('/')));
 // rouge en ultra → retour reprise
 s = E.computeState(p2, [{ ...g('2027-02-20', 'longue'), during: 7 }], '2027-02-21');
-assert.equal(s.mode, 'reprise'); assert.equal(s.level, 12);
+assert.equal(s.mode, 'reprise'); assert.equal(s.level, 14);
 // Projection
 s = E.computeState(prof, [], '2026-11-19');
 const pr = E.projection(prof, s, '2026-11-19', barjo, 40);
@@ -58,9 +62,9 @@ pr.weeks.forEach(w => w.sessions.forEach(x => x.blocks.forEach(b => (b.rep ? b.s
 // Rythme dynamique : le footing cadence vert compte aussi
 const dynp = { ...prof, rythme: 'dynamique' };
 s = E.computeState(dynp, [g('2026-11-24'), g('2026-11-26', 'cadence')], '2026-11-27');
-assert.equal(s.level, 9);
+assert.equal(s.level, 11);
 s = E.computeState(prof, [g('2026-11-24'), g('2026-11-26', 'cadence')], '2026-11-27');
-assert.equal(s.level, 8);
+assert.equal(s.level, 10);
 const s0 = E.computeState(dynp, [], '2026-11-19');
 const prd = E.projection(dynp, s0, '2026-11-19', barjo, 40);
 const prp = E.projection(prof, E.computeState(prof, [], '2026-11-19'), '2026-11-19', barjo, 40);
@@ -72,28 +76,28 @@ console.log('Barjo : prudent', fp.weeks, 'sem.', fp.feas, '| dynamique', fd.week
 const rd = E.analyseRace(raid, ref, E.prepStart(dynp, s0, '2026-11-19'));
 console.log('Raid : dynamique', rd.weeks, 'sem.', rd.feas);
 // Chaque marche de palier ≤ 10 % (sauf course/marche → continu)
-for (let i = 4; i < E.LEVELS.length; i++) assert.ok(E.LEVELS[i].run / E.LEVELS[i - 1].run <= 1.115, 'palier ' + (i + 1));
+for (let i = 1; i < E.LEVELS.length; i++) assert.ok(E.LEVELS[i].run / E.LEVELS[i - 1].run <= 1.115, 'palier ' + (i + 1));
 // Semaine de consolidation : 4e semaine du cycle, pas de montée
 const cp = { ...prof, cycleStart: '2026-11-16' };
 assert.equal(E.isConsolidation(cp, '2026-12-08'), true); assert.equal(E.isConsolidation(cp, '2026-12-15'), false);
 s = E.computeState(cp, [g('2026-12-08'), g('2026-12-10')], '2026-12-11');
-assert.equal(s.level, 8);
+assert.equal(s.level, 10);
 const cw = E.repriseWeek(cp, { level: 10 }, '2026-12-07');
 assert.equal(cw[0].level, 9); assert.ok(cw[0].consolidation);
 const prc = E.projection({ ...cp, rythme: 'dynamique' }, E.computeState(cp, [], '2026-11-19'), '2026-11-19', null, 40);
 console.log('dynamique + consolidation : base', prc.baseDate, 'programme', prc.switchDate);
 // ancienne échelle → nouvelle
-assert.equal(E.LADDER_V1[6], 8); assert.equal(E.LEVELS[7].run, 40);
+assert.equal(E.LEVELS[4].title, '2 × 14 min (2 min de marche entre)'); assert.equal(E.LEVELS[9].run, 40);
 // « Orange pendant » : douleur pendant seulement
 const j = d => ({ ...g(d), during: 5, after: 2, morning: 0 });
 assert.equal(E.verdict(j('2026-11-24')), 'jaune');
 assert.equal(E.verdict({ ...j('2026-11-24'), morning: 2 }), 'orange');
 // série conservée : vert, jaune, vert → palier suivant
 s = E.computeState(prof, [g('2026-11-24'), j('2026-11-26'), g('2026-12-01')], '2026-12-02');
-assert.equal(s.level, 9);
+assert.equal(s.level, 11);
 // deux jaunes de suite → orange : série remise à zéro
 s = E.computeState(prof, [g('2026-11-24'), j('2026-11-26'), j('2026-12-01'), g('2026-12-03')], '2026-12-04');
-assert.equal(s.logs[2]._v, 'orange'); assert.equal(s.level, 8); assert.equal(s.streak, 1);
+assert.equal(s.logs[2]._v, 'orange'); assert.equal(s.level, 10); assert.equal(s.streak, 1);
 // en programme : un jaune n'allège pas la semaine, deux de suite oui
 s = E.computeState(p2, [j('2027-02-20')], '2027-02-21'); assert.equal(Object.keys(s.reduce).length, 0);
 s = E.computeState(p2, [j('2027-02-20'), j('2027-02-23')], '2027-02-24'); assert.equal(Object.keys(s.reduce).length, 1);
