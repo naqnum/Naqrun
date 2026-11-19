@@ -174,8 +174,8 @@ function zchip(i) { var z = zones()[i]; return '<span class="zchip" style="borde
 function stepsHtml(blocks) {
   function one(st) {
     var kind = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : st.k === "velo" ? "Vélo" : "Course";
-    var lign = /^Ligne|^Petits pas/.test(st.label || "");
-    var zone = st.k === "marche" ? "" : lign ? (/^Petits pas/.test(st.label || "") ? " · même effort, pas plus vite : pas plus courts, plus nombreux" : " · vif et relâché") : " · " + zchip(st.k === "cote" ? 1 : 0) + (DB.profile.hrTrusted ? "" : " <span class=\"muted\">indicatif</span>");
+    var lign = /^Ligne/.test(st.label || "");
+    var zone = st.k === "marche" ? "" : lign ? " · vif et relâché" : " · " + zchip(st.k === "cote" ? 1 : 0) + (DB.profile.hrTrusted ? "" : " <span class=\"muted\">indicatif</span>");
     if (st.k === "velo") zone = " · " + zchip(0);
     return '<li><i class="' + st.k + '" aria-hidden="true"></i><div><div class="t">' + esc(st.label || kind) + '</div><div class="d">' + hm(st.min < 1 ? 0 : st.min) .replace(/^0 min$/, Math.round(st.min * 60) + " s") + zone + "</div></div></li>";
   }
