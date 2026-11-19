@@ -1,5 +1,5 @@
 // NaqRun : réseau d'abord, copie locale si pas de réseau.
-const CACHE = "naqrun-v2";
+const CACHE = "naqrun-v3";
 const FILES = ["./", "index.html", "engine.js", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(self.clients.claim()); });

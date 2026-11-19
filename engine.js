@@ -78,7 +78,8 @@
       if (s.mode === "ultra") { if (v === "orange") s.reduce[addDays(mondayOf(log.date), 7)] = true; return; }
       if (v === "orange") { s.streak = 0; return; }
       // vert : seules les séances « palier » font monter
-      if (log.kind === "palier" || log.kind == null) {
+      // rythme « dynamique » : le footing cadence vert compte aussi → jusqu'à un palier par semaine
+      if (log.kind === "palier" || log.kind == null || (profile.rythme === "dynamique" && log.kind === "cadence")) {
         s.streak++;
         if (s.streak >= 2 && s.level <= MAX_LEVEL) { s.level++; s.streak = 0; s.events.push({ date: log.date, t: "Palier suivant" }); }
       }
@@ -263,20 +264,22 @@
   }
 
   // ---------- Projection des semaines à venir ----------
-  // Hypothèse : une séance palier par semaine, toutes vertes → un palier toutes les 2 semaines.
+  // Hypothèse : toutes les séances vertes. Rythme prudent : un palier toutes les 2 semaines ;
+  // rythme dynamique : palier + footing cadence comptent → un palier par semaine.
   function projection(profile, state, today, race, nWeeks) {
     nWeeks = nWeeks || 26;
     var monday = mondayOf(today), out = [];
     var level = Math.min(state.level, MAX_LEVEL + 1), streak = state.streak;
     var switchDate = state.mode === "ultra" ? (state.ultraStart || profile.switchDate) : null, passWeeks = 0;
-    var prog = null;
+    var prog = null, perWeek = profile.rythme === "dynamique" ? 2 : 1, baseDate = state.mode === "ultra" || state.level >= 11 ? monday : null;
     for (var i = 0; i < nWeeks; i++) {
       var m = addDays(monday, i * 7), w = { monday: m, sessions: [] };
       if (!switchDate) {
         if (level <= MAX_LEVEL) {
           w.mode = "reprise"; w.level = level;
           w.sessions = repriseWeek(profile, { level: level }, m);
-          if (i > 0 || weekday(today) <= 1) { streak++; if (streak >= 2) { level++; streak = 0; } }
+          if (!baseDate && level >= 11) baseDate = m;
+          if (i > 0 || weekday(today) <= 1) { streak += perWeek; while (streak >= 2) { level++; streak -= 2; } }
         } else if (passWeeks < 3) {
           w.mode = "passage"; w.level = MAX_LEVEL; passWeeks++;
           w.sessions = repriseWeek(profile, { level: MAX_LEVEL }, m);
@@ -296,7 +299,9 @@
       w.runMinutes = w.sessions.filter(function (x) { return x.kind !== "velo"; }).reduce(function (t, x) { return t + totalMin(x.blocks); }, 0);
       out.push(w);
     }
-    return { weeks: out, switchDate: switchDate };
+    // baseDate : semaine où la reprise atteint le relief (palier 11, ≈ 5 h/semaine avec vélo et rando),
+    // à partir de laquelle le rythme dynamique compte la préparation
+    return { weeks: out, switchDate: switchDate, baseDate: baseDate };
   }
 
   // ---------- Export Intervals.icu ----------
@@ -325,6 +330,12 @@
     return { category: "WORKOUT", type: session.sport || "Run", start_date_local: session.date + "T00:00:00", name: session.title, description: intervalsText(session.blocks), moving_time: Math.round(totalMin(session.blocks) * 60) };
   }
 
+  function prepStart(profile, state, today) {
+    if (state.mode === "ultra") return state.ultraStart || today;
+    var pr = projection(profile, state, today, null, 80);
+    return (profile.rythme === "dynamique" ? pr.baseDate : pr.switchDate) || addDays(today, 560);
+  }
+
   // ---------- Estimation de la charge cible (fin de reprise) ----------
   function estimateOptimal(profile, state, today) {
     if (state.mode === "ultra") return null;
@@ -334,7 +345,7 @@
 
   var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, PHASES: PHASES, verdict: verdict, computeState: computeState, passage: passage,
     repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, weekSessions: weekSessions,
-    totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal,
+    totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal, prepStart: prepStart,
     addDays: addDays, diffDays: diffDays, todayStr: todayStr, longDate: longDate, monthYear: monthYear, mondayOf: mondayOf, weekday: weekday };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Engine = api;
 })(this);

@@ -284,7 +284,8 @@ function stat(v, l) { return '<div class="stat"><b>' + esc(v) + "</b><span>" + e
 function slider(label, key, val) { return '<label class="field"><span class="row">' + esc(label) + ' <span class="val" id="o-' + key + '">' + val + '/10</span></span><input type="range" min="0" max="10" value="' + val + '" data-pain="' + key + '"></label>'; }
 function verdictHtml(d) {
   var v = E.verdict(d), prov = d.morning == null;
-  var m = { vert: d.kind === "palier" ? "Séance validée. Deux séances palier vertes de suite : palier suivant." : "Séance validée (seules les séances palier font monter de palier).", orange: "Tu refais le même palier.", rouge: "Recul de 2 paliers et 48 h sans course.", stop: "Arrête la course et demande un avis médical." }[v];
+  var counts = d.kind === "palier" || (DB.profile.rythme === "dynamique" && d.kind === "cadence");
+  var m = { vert: counts ? "Séance validée. Deux séances vertes qui comptent, de suite : palier suivant." : "Séance validée (elle ne fait pas monter de palier).", orange: "Tu refais le même palier.", rouge: "Recul de 2 paliers et 48 h sans course.", stop: "Arrête la course et demande un avis médical." }[v];
   return '<div class="row"><h2>Prévision</h2>' + chip(v, prov) + '</div><p class="muted">' + esc(m + (prov && v !== "stop" ? " Confirmée après la note du lendemain matin." : "")) + "</p>";
 }
 
@@ -323,7 +324,7 @@ function vPlan() {
 function vCourse() {
   var s = S(), t = today(), p = DB.profile;
   var r = UI.raceDraft || (UI.raceDraft = Object.assign({}, p.race || RACE_EXAMPLE));
-  var start = s.mode === "ultra" ? (s.ultraStart || t) : E.estimateOptimal(p, s, t);
+  var start = E.prepStart(p, s, t);
   var h = "";
   h += '<header class="hdr"><div><p class="muted">Objectif : être finisher</p><h1>Course</h1></div></header>';
   h += '<section class="card"><h2>Fiche course</h2>' +
@@ -346,7 +347,7 @@ function raceAnalysis(r, s, start) {
     h += '<section class="card"><h2>Analyse</h2><div class="grid4">' + stat(an.kmE, "km-effort") + stat(an.ratio, "m D+/km") + stat(cap(an.profil), "profil") + stat(an.stages, an.stages > 1 ? "étapes" : "étape") + "</div>" +
       '<p>Durée estimée : <strong>' + hh(an.totalHours) + "</strong>" + (an.stages > 1 ? " (≈ " + hh(an.stageHours) + " par étape)" : "") + '</p><p class="muted">Estimation à partir de ta course de référence (réglages), seulement pour dimensionner les sorties longues. Pas un objectif.</p>' +
       (an.margin != null ? '<div class="notice ' + (an.margin >= 2 ? "ok" : an.margin >= 0 ? "" : "err") + '">Marge estimée sur le temps limite : ' + (an.margin >= 0 ? hh(an.margin) : "dépassement de " + hh(-an.margin)) + ".</div>" : "") +
-      '<p>Préparation recommandée (' + esc(an.prep.label) + ") : <strong>" + an.prep.min + " à " + an.prep.max_ + ' semaines</strong></p><p class="muted">Semaines disponibles depuis ' + (s.mode === "ultra" ? "le début du programme" : "la fin de reprise estimée (" + E.monthYear(start) + ")") + " : " + an.weeks + "</p>" +
+      '<p>Préparation recommandée (' + esc(an.prep.label) + ") : <strong>" + an.prep.min + " à " + an.prep.max_ + ' semaines</strong></p><p class="muted">Semaines disponibles depuis ' + (s.mode === "ultra" ? "le début du programme" : p.rythme === "dynamique" ? "l\'arrivée au relief en reprise (" + E.monthYear(start) + "), quand ton volume forme déjà une base" : "la fin de reprise estimée (" + E.monthYear(start) + ")") + " : " + an.weeks + "</p>" +
       '<div class="notice ' + (an.feas === "ok" ? "ok" : an.feas === "tendu" ? "" : "err") + '">' + esc(feasTxt) + "</div></section>";
   }
   return h;
@@ -359,16 +360,19 @@ function vProj() {
   var weeks = pr.weeks.filter(function (w) { return w.mode !== "attente"; });
   var maxMin = Math.max.apply(null, weeks.map(function (w) { return w.minutes; }).concat([60]));
   h += '<header class="hdr"><div><p class="muted">Si toutes les séances restent vertes</p><h1>Projection</h1></div></header>';
+  var dyn = p.rythme === "dynamique";
+  h += '<section class="card"><h2>Rythme de progression</h2><div class="btns"><button class="small' + (dyn ? "" : " primary") + '" data-act="rythme" data-v="prudent" aria-pressed="' + !dyn + '">Prudent</button><button class="small' + (dyn ? " primary" : "") + '" data-act="rythme" data-v="dynamique" aria-pressed="' + dyn + '">Dynamique</button></div>' +
+    '<p class="muted">' + (dyn ? "Dynamique : le footing palier et le footing cadence verts comptent tous les deux, soit jusqu\'à un palier par semaine (+5 min). La préparation de course compte dès que la reprise atteint le relief. Les règles douleur ne changent pas : un orange bloque la montée, un rouge fait reculer." : "Prudent : seule la séance palier compte, soit un palier toutes les deux semaines. La préparation de course compte après le test de passage.") + "</p></section>";
   h += '<section class="card"><div class="row"><h2>Grandes étapes</h2></div>' +
     '<p>Fin des paliers de reprise : <strong>' + esc((function () { var w = pr.weeks.filter(function (x) { return x.mode === "passage"; })[0]; return w ? cap(E.longDate(w.monday)) : (s.mode === "ultra" ? "faite" : "au-delà de 9 mois"); })()) + "</strong></p>" +
     '<p>Début du programme ultra : <strong>' + esc(pr.switchDate ? cap(E.longDate(pr.switchDate)) : "à définir") + "</strong></p>" +
     (p.race ? '<p>Course : <strong>' + esc(p.race.name) + "</strong>, " + esc(E.longDate(p.race.date)) + "</p>" : '<p class="muted">Ajoute une course dans l\'onglet Course pour voir le programme se projeter.</p>') +
-    '<p class="muted">Hypothèse : une séance palier par semaine, deux vertes de suite pour monter. Chaque séance orange ou rouge décale tout ; la projection se recalcule à chaque saisie.</p></section>';
+    '<p class="muted">Hypothèse : toutes les séances vertes, au rythme choisi ci-dessus. Chaque séance orange ou rouge décale tout ; la projection se recalcule à chaque saisie.</p></section>';
   var month = "", body = "";
   weeks.forEach(function (w, i) {
     var mth = E.monthYear(w.monday);
     if (mth !== month) { if (body) h += body + "</section>"; month = mth; body = '<section class="card"><h2>' + esc(cap(mth)) + "</h2>"; }
-    var lab = w.mode === "programme" ? w.block + (w.choc ? " · choc" : "") + (w.light ? " · allégée" : "") : w.mode === "passage" ? "Test de passage" : "Palier " + w.level + " · " + E.LEVELS[w.level - 1].title;
+    var lab = w.mode === "programme" ? w.block + (w.choc ? " · choc" : "") + (w.light ? " · allégée" : "") : w.mode === "passage" ? "Test de passage" : "Palier " + Math.min(w.level, 15) + " · " + E.LEVELS[Math.min(w.level, 15) - 1].title;
     var run = Math.round(w.runMinutes), tot = Math.round(w.minutes);
     body += '<details class="week' + (i === 0 ? " cur" : "") + '"' + (i === 0 ? " open" : "") + '><summary style="display:flex;flex-direction:column;align-items:stretch;gap:6px">' +
       '<span class="row"><span>Sem. du ' + esc(E.longDate(w.monday).replace(/^\S+ /, "")) + '</span><span class="muted">' + hm(tot) + "</span></span>" +
@@ -453,6 +457,7 @@ document.addEventListener("click", function (ev) {
     }).catch(function (e) { UI.msg.act = { t: "err", m: ivError(e) }; render(); });
     return;
   }
+  if (a === "rythme") { p.rythme = b.dataset.v; save(); return render(); }
   if (a === "switch") { if (confirm("Passer au programme ultra à partir d'aujourd'hui ?")) { p.switchDate = t; save(); } return render(); }
   if (a === "unswitch") { if (confirm("Revenir en mode reprise ?")) { p.switchDate = null; save(); } return render(); }
   if (a === "saverace") {
@@ -497,7 +502,7 @@ document.addEventListener("change", function (ev) {
   if (t.dataset.flag != null && UI.draft) { UI.draft.flags[+t.dataset.flag] = t.checked; return refreshVerdict(); }
   if (t.dataset.pass) { p[t.dataset.pass] = t.checked; save(); return render(); }
   if (t.dataset.gate) { p.gates[t.dataset.gate] = t.checked; save(); return render(); }
-  if (t.dataset.race) { readRace(); var s2 = S(), box = document.getElementById("raceAnalysis"); if (box) box.innerHTML = raceAnalysis(UI.raceDraft, s2, s2.mode === "ultra" ? (s2.ultraStart || today()) : E.estimateOptimal(DB.profile, s2, today())); return; }
+  if (t.dataset.race) { readRace(); var s2 = S(), box = document.getElementById("raceAnalysis"); if (box) box.innerHTML = raceAnalysis(UI.raceDraft, s2, E.prepStart(DB.profile, s2, today())); return; }
   if (t.id === "startLevel") { p.startLevel = +t.value; save(); return; }
   if (t.id === "hoursMax") { p.hoursMax = Math.max(5, Math.min(16, +t.value || 10)); save(); return; }
   if (t.id === "refKm" || t.id === "refDp" || t.id === "refH") { var k = { refKm: "km", refDp: "dplus", refH: "hours" }[t.id]; if (+t.value > 0) { p.ref[k] = +t.value; save(); } return; }

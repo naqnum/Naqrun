@@ -55,4 +55,20 @@ console.log('projection', pr.switchDate, pr.weeks.map(w => w.monday.slice(5) + '
 assert.ok(pr.weeks.some(w => w.mode === 'programme'));
 // Toutes les étapes en temps (jamais de distance)
 pr.weeks.forEach(w => w.sessions.forEach(x => x.blocks.forEach(b => (b.rep ? b.steps : [b]).forEach(st => assert.ok(st.min > 0)))));
+// Rythme dynamique : le footing cadence vert compte aussi
+const dynp = { ...prof, rythme: 'dynamique' };
+s = E.computeState(dynp, [g('2026-11-24'), g('2026-11-26', 'cadence')], '2026-11-27');
+assert.equal(s.level, 7);
+s = E.computeState(prof, [g('2026-11-24'), g('2026-11-26', 'cadence')], '2026-11-27');
+assert.equal(s.level, 6);
+const s0 = E.computeState(dynp, [], '2026-11-19');
+const prd = E.projection(dynp, s0, '2026-11-19', barjo, 40);
+const prp = E.projection(prof, E.computeState(prof, [], '2026-11-19'), '2026-11-19', barjo, 40);
+console.log('prudent : programme', prp.switchDate, '| dynamique : base', prd.baseDate, 'programme', prd.switchDate);
+assert.ok(prd.switchDate < prp.switchDate);
+const fd = E.analyseRace(barjo, ref, E.prepStart(dynp, s0, '2026-11-19'));
+const fp = E.analyseRace(barjo, ref, E.prepStart(prof, E.computeState(prof, [], '2026-11-19'), '2026-11-19'));
+console.log('Barjo : prudent', fp.weeks, 'sem.', fp.feas, '| dynamique', fd.weeks, 'sem.', fd.feas);
+const rd = E.analyseRace(raid, ref, E.prepStart(dynp, s0, '2026-11-19'));
+console.log('Raid : dynamique', rd.weeks, 'sem.', rd.feas);
 console.log('OK');
