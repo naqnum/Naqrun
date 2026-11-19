@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0F11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NaqRun">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>NaqRun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#0E0F11;--surface:#1A1C20;--surface2:#22252A;--text:#F2F2F0;--muted:#A6AAB1;--border:#2B2E34;
+  --accent:#FF7A1A;--accent-text:#140A02;--soft:#2A1D12;--soft-text:#FFB27A;
+  --g-bg:#15301F;--g:#7FD8A0;--o-bg:#3A2410;--o:#FFB066;--r-bg:#3A1614;--r:#FF948A;
+  --head:'Space Grotesk',system-ui,sans-serif;--body:'Inter',system-ui,-apple-system,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);-webkit-text-size-adjust:100%}
+body{min-height:100vh}
+main{max-width:560px;margin:0 auto;padding:calc(20px + var(--safe-t)) 16px calc(100px + var(--safe-b));display:flex;flex-direction:column;gap:14px}
+h1{margin:0;font-family:var(--head);font-weight:700;font-size:28px;line-height:1.1}
+h2{margin:0;font-family:var(--head);font-weight:700;font-size:17px}
+p{margin:0}
+.muted{color:var(--muted);font-size:13px;line-height:1.45}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip.soft{background:var(--soft);color:var(--soft-text)}
+.chip.vert{background:var(--g-bg);color:var(--g)}.chip.orange{background:var(--o-bg);color:var(--o)}.chip.rouge,.chip.stop{background:var(--r-bg);color:var(--r)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+.hero{display:flex;align-items:baseline;gap:6px}
+.hero b{font-family:var(--head);font-weight:700;font-size:72px;line-height:.9}
+.hero span{font-family:var(--head);font-size:20px;color:var(--muted)}
+ul.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+ul.steps li{display:flex;gap:12px;align-items:flex-start}
+ul.steps i{margin-top:5px;width:10px;height:10px;border-radius:3px;flex:none;background:var(--muted)}
+ul.steps i.course{background:var(--accent)}ul.steps i.cote{background:var(--r)}
+ul.steps .t{font-size:15px;font-weight:600}ul.steps .d{font-size:13px;color:var(--muted)}
+.rep{border-left:2px solid var(--border);padding-left:10px;margin-left:4px;display:flex;flex-direction:column;gap:8px}
+button,.btn{font-family:var(--body);font-size:15px;font-weight:600;min-height:48px;border-radius:8px;padding:0 16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);background:transparent;color:var(--text);text-decoration:none}
+button.primary{background:var(--accent);color:var(--accent-text);border:none}
+button.small{min-height:36px;font-size:13px;padding:0 12px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btns{display:flex;gap:8px;flex-wrap:wrap}.btns>*{flex:1}
+.bar{height:8px;border-radius:999px;background:var(--border);overflow:hidden}.bar>div{height:100%;background:var(--accent);border-radius:999px}
+label.check{display:flex;gap:10px;align-items:center;min-height:36px;font-size:14px}
+label.check input{width:20px;height:20px;accent-color:var(--accent);margin:0;flex:none}
+.field{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.field .val{color:var(--muted);font-weight:500}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0;height:28px}
+input[type=text],input[type=password],input[type=date],input[type=number],select,textarea{font:inherit;font-size:16px;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;width:100%}
+textarea{min-height:80px;resize:vertical}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat b{display:block;font-family:var(--head);font-size:20px}.stat span{font-size:12px;color:var(--muted)}
+.notice{background:var(--soft);color:var(--soft-text);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45}
+.notice.err{background:var(--r-bg);color:var(--r)}.notice.ok{background:var(--g-bg);color:var(--g)}
+.phases{display:flex;gap:3px}.phases div{height:14px;border-radius:4px;background:var(--border)}.phases div.on{background:var(--accent)}
+.plabels{display:flex;gap:3px}.plabels span{font-size:11px;color:var(--muted)}
+ol.tl{list-style:none;margin:0;padding:0}
+ol.tl li{position:relative;display:flex;gap:12px;padding-bottom:14px}
+ol.tl li:not(:last-child)::after{content:"";position:absolute;left:7px;top:20px;bottom:-2px;width:2px;background:var(--border)}
+ol.tl .c{width:16px;height:16px;border-radius:50%;border:2px solid var(--accent);flex:none;margin-top:2px;background:var(--surface)}
+ol.tl .c.done{background:var(--accent)}
+ol.tl .w{font-size:13px;font-weight:600;color:var(--soft-text)}
+.lv{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
+.lv:last-child{border-bottom:none}
+.lv .n{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--surface2);color:var(--muted);flex:none}
+.lv.done .n{background:var(--g-bg);color:var(--g)}.lv.cur .n{background:var(--accent);color:var(--accent-text)}
+.lv.cur{font-weight:600}
+.week{border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.week.cur{border-color:var(--accent)}
+.sess{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.log{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid var(--border)}
+.log:last-child{border-bottom:none}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:center;padding:0 8px var(--safe-b);z-index:5}
+nav.tabs .in{display:flex;max-width:560px;width:100%}
+nav.tabs button{flex:1;flex-direction:column;gap:4px;border:none;border-radius:0;min-height:62px;font-size:12px;font-weight:500;color:var(--muted);background:transparent}
+nav.tabs button[aria-current=page]{color:var(--accent);font-weight:700}
+nav.tabs button::before{content:"";width:20px;height:3px;border-radius:2px;background:transparent}
+nav.tabs button[aria-current=page]::before{background:var(--accent)}
+.iconbtn{min-height:44px;min-width:44px;padding:0;border:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+details summary{cursor:pointer;font-size:14px;font-weight:600;min-height:32px;display:flex;align-items:center}
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite"></main>
+<nav class="tabs" aria-label="Navigation principale"><div class="in">
+  <button data-tab="today">Aujourd'hui</button>
+  <button data-tab="journal">Journal</button>
+  <button data-tab="plan">Plan</button>
+  <button data-tab="renfo">Renfo</button>
+</div></nav>
+<script src="engine.js"></script>
+<script>
+"use strict";
+var E = window.Engine;
+var KEY = "naqrun.v1";
+var RENFO = [
+  { t: "Montées sur pointes lentes", d: "3 × 15, descente en 3 secondes, genou tendu" },
+  { t: "Montées sur pointes genou fléchi", d: "3 × 15, descente lente" },
+  { t: "Relevés de pointes dos au mur", d: "3 × 20 (muscle tibial antérieur)" },
+  { t: "Marche sur les talons", d: "2 × 30 m" },
+  { t: "Équilibre sur une jambe", d: "3 × 30 s par jambe, yeux fermés si facile" },
+  { t: "Serviette ramassée avec les orteils", d: "2 × 1 min par pied" },
+];
+var DEFAULT = { profile: { startLevel: 6, raceDate: "2027-06-17", raceConfirmed: false, peakHours: 10, switchDate: null, hop: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "" }, logs: [], renfo: {}, sent: {} };
+var GATES = [
+  { k: "g1", date: "2027-02-15", w: "Mi-février", c: "Test de passage validé" },
+  { k: "g2", date: "2027-03-31", w: "Fin mars", c: "8 h/semaine depuis 3 semaines, sortie de 3 h sans douleur" },
+  { k: "g3", date: "2027-04-30", w: "Fin avril", c: "Week-end enchaîné 4 h + 3 h sans douleur" },
+  { k: "g4", date: "2027-05-31", w: "Fin mai", c: "Bloc de 3 jours (35 + 30 + 25 km) sans douleur" },
+];
+
+function load() { try { var x = JSON.parse(localStorage.getItem(KEY)); if (x && x.profile) { x.profile = Object.assign({}, DEFAULT.profile, x.profile); x.renfo = x.renfo || {}; x.sent = x.sent || {}; x.logs = x.logs || []; return x; } } catch (e) {} return JSON.parse(JSON.stringify(DEFAULT)); }
+var DB = load();
+var saveOk = true;
+function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); saveOk = true; } catch (e) { saveOk = false; } }
+var UI = { tab: (location.hash || "#today").slice(1), draft: null, msg: {} };
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+function today() { return E.todayStr(); }
+function S() { return E.computeState(DB.profile, DB.logs, today()); }
+function chip(v, prov) {
+  var lab = { vert: "Verte", orange: "Orange", rouge: "Rouge", stop: "Arrêt" }[v];
+  return '<span class="chip ' + v + '"><span class="dot"></span>' + lab + (prov && v !== "stop" ? " (provisoire)" : "") + "</span>";
+}
+function hm(min) { min = Math.round(min); if (min < 60) return min + " min"; var h = Math.floor(min / 60), m = min % 60; return h + " h" + (m ? " " + String(m).padStart(2, "0") : ""); }
+function stepsHtml(blocks) {
+  function one(st) {
+    var kind = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : "Course";
+    var zone = st.k === "marche" ? "" : st.k === "cote" ? " · zone 3" : " · zone 2";
+    return '<li><i class="' + st.k + '" aria-hidden="true"></i><div><div class="t">' + esc(st.label || kind) + '</div><div class="d">' + hm(st.min) + zone + "</div></div></li>";
+  }
+  return '<ul class="steps">' + blocks.map(function (b) {
+    if (b.rep) return '<li><div style="flex:1"><div class="t">' + b.rep + " répétitions</div><ul class=\"steps rep\" style=\"margin-top:8px\">" + b.steps.map(one).join("") + "</ul></div></li>";
+    return one(b);
+  }).join("") + "</ul>";
+}
+
+// ---------- Intervals.icu ----------
+function ivAuth() { return "Basic " + btoa("API_KEY:" + DB.profile.intervalsKey.trim()); }
+function ivBase() { return "https://intervals.icu/api/v1/athlete/" + encodeURIComponent(DB.profile.intervalsId.trim()); }
+function ivReady() { return DB.profile.intervalsId.trim() && DB.profile.intervalsKey.trim(); }
+function ivFetch(path, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ Authorization: ivAuth(), "Content-Type": "application/json", Accept: "application/json" }, opts.headers || {});
+  return fetch(ivBase() + path, opts).then(function (r) {
+    if (r.status === 401 || r.status === 403) throw new Error("auth");
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.status === 204 ? null : r.json();
+  }, function () { throw new Error("network"); });
+}
+function ivError(e) {
+  if (e.message === "auth") return "Intervals.icu refuse la connexion : vérifie ton identifiant d'athlète et ta clé API dans les réglages.";
+  if (e.message === "network") return "Impossible de joindre Intervals.icu (pas de réseau, ou appel bloqué). Tu peux copier la séance et la coller dans Intervals.";
+  return "Intervals.icu a répondu une erreur (" + e.message + ").";
+}
+function sendSession(session, key) {
+  var msgKey = "send-" + key;
+  if (!ivReady()) { UI.msg[msgKey] = { t: "err", m: "Renseigne d'abord ton compte Intervals.icu dans les réglages (icône en haut à droite)." }; render(); return; }
+  var ev = E.intervalsEvent(session), prev = DB.sent[session.date + "|" + session.title];
+  UI.msg[msgKey] = { t: "", m: "Envoi en cours…" }; render();
+  var p = prev ? ivFetch("/events/" + prev, { method: "PUT", body: JSON.stringify(ev) }).catch(function (e) { if (e.message === "http 404") return ivFetch("/events", { method: "POST", body: JSON.stringify(ev) }); throw e; })
+               : ivFetch("/events", { method: "POST", body: JSON.stringify(ev) });
+  p.then(function (res) {
+    if (res && res.id != null) DB.sent[session.date + "|" + session.title] = res.id;
+    save();
+    UI.msg[msgKey] = { t: "ok", m: "Séance envoyée à Intervals.icu pour le " + E.longDate(session.date) + ". Elle arrive sur ta Fenix à la prochaine synchro Garmin Connect (les 7 prochains jours sont envoyés)." };
+    render();
+  }).catch(function (e) { UI.msg[msgKey] = { t: "err", m: ivError(e), copy: true }; render(); });
+}
+function copySession(session, key) {
+  var txt = session.title + "\n\n" + E.intervalsText(session.blocks);
+  var done = function () { UI.msg["send-" + key] = { t: "ok", m: "Texte copié. Colle-le dans une séance de course du calendrier Intervals.icu." }; render(); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { prompt("Copie ce texte :", txt); });
+  else { prompt("Copie ce texte :", txt); }
+}
+function msgHtml(key) {
+  var m = UI.msg["send-" + key]; if (!m) return "";
+  return '<div class="notice ' + m.t + '">' + esc(m.m) + "</div>" + (m.copy ? '<button class="small" data-act="copy" data-key="' + key + '">Copier la séance</button>' : "");
+}
+
+// ---------- Vues ----------
+var SESSIONS = {}; // clé -> séance, pour les boutons
+function sessionCard(sess, key, opts) {
+  SESSIONS[key] = sess;
+  opts = opts || {};
+  var min = E.totalMin(sess.blocks);
+  var sub = sess.level ? "Palier " + sess.level + " sur " + E.MAX_LEVEL + " · " + sess.phase : (sess.week ? sess.week.block + " · semaine " + sess.week.i + " · " + sess.week.hours + " h prévues" : "");
+  return '<section class="card">' +
+    (opts.label ? '<div class="row"><h2>' + esc(opts.label) + "</h2>" + (opts.right || "") + "</div>" : "") +
+    '<div class="hero"><b>' + Math.round(min) + '</b><span>min au total</span></div>' +
+    '<p style="font-family:var(--head);font-weight:700;font-size:20px">' + esc(sess.title) + "</p>" +
+    '<p class="muted">' + esc(sub) + "</p>" +
+    stepsHtml(sess.blocks) +
+    (sess.note ? '<p class="muted">' + esc(sess.note) + "</p>" : "") +
+    '<button class="primary" data-act="send" data-key="' + key + '"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="3"></rect><path d="M9 6l1-3h4l1 3M9 18l1 3h4l1-3M12 10v2l1 1"></path></svg>Envoyer sur la Fenix 7X</button>' +
+    msgHtml(key) +
+    '<p class="muted" style="text-align:center">Terrain souple de préférence. Arrêt si la douleur dépasse 3/10.</p></section>';
+}
+
+function vToday() {
+  var s = S(), t = today(), p = DB.profile, h = "";
+  h += '<header class="hdr"><div><p class="muted">' + esc(cap(E.longDate(t))) + '</p><h1>Aujourd\'hui</h1></div><div style="display:flex;gap:6px;align-items:center"><span class="chip soft">' + (s.mode === "ultra" ? "Plan Raid" : "Mode reprise") + '</span><button class="iconbtn" data-act="settings" aria-label="Réglages"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></button></div></header>';
+  if (!saveOk) h += '<div class="notice err">Le stockage du téléphone est indisponible : tes saisies ne seront pas gardées. Ouvre l\'appli dans Safari (pas en navigation privée).</div>';
+  if (!DB.logs.length && !p._welcomed) h += '<section class="card"><h2>Bienvenue sur NaqRun</h2><p class="muted">Tu démarres au palier ' + p.startLevel + ' (' + esc(E.LEVELS[p.startLevel - 1].title) + '). Change-le dans les réglages si besoin, et relie ton compte Intervals.icu pour envoyer les séances sur ta Fenix.</p><div class="btns"><button class="small" data-act="settings">Réglages</button><button class="small" data-act="welcome">Compris</button></div></section>';
+  if (s.stopped) {
+    h += '<section class="card" style="border-color:var(--r)"><div class="row"><h2>Arrêt</h2>' + chip("stop") + '</div><p>Tu as signalé un signe d\'arrêt (douleur précise sur l\'os, douleur au repos ou boiterie). Arrête la course et demande un avis médical : ce sont des signes possibles de fracture de fatigue.</p><button data-act="clearstop">J\'ai eu le feu vert médical</button></section>';
+  }
+  var pending = s.logs.filter(function (l) { return l.morning == null && l.date < t; }).pop();
+  if (pending) {
+    h += '<section class="card"><div class="row"><h2>Note du matin</h2><span class="muted">séance du ' + esc(E.longDate(pending.date)) + '</span></div><label class="field">Douleur au réveil <span class="val" id="mv">0/10</span><input type="range" min="0" max="10" value="0" id="morningQuick" data-out="mv"></label><button class="primary" data-act="morning" data-id="' + pending.id + '">Valider la note</button></section>';
+  }
+  if (!s.stopped) {
+    var ns = E.nextSession(p, s, t);
+    if (!ns) h += '<section class="card"><h2>Plan terminé</h2><p class="muted">Bonne course sur le Raid de l\'Archange !</p></section>';
+    else {
+      var rest = ns.date > t;
+      h += sessionCard(ns, "today", { label: rest ? "Prochaine séance" : "Séance du jour", right: '<span class="muted">' + (rest ? esc(cap(E.longDate(ns.date))) : "") + "</span>" });
+      if (rest) h += '<div class="notice">Repos aujourd\'hui' + (s.lastVerdict === "rouge" ? " (48 h après une séance rouge)" : "") + '. Le renfo reste possible.</div>';
+      else h += '<button data-act="tolog">J\'ai fait la séance : remplir le journal</button>';
+    }
+  }
+  if (s.lastVerdict) {
+    var lastLog = s.logs[s.logs.length - 1];
+    var txt = s.mode === "ultra" ? "Plan Raid en cours." : (s.done ? "Reprise terminée : passe le test de passage dans l'onglet Plan." : (s.streak + " séance verte sur 2 pour passer au palier " + Math.min(s.level + 1, 15) + "."));
+    h += '<section class="card"><div class="row"><h2>Dernière séance</h2>' + chip(lastLog._v, lastLog._provisional) + '</div><p class="muted">' + esc(txt) + "</p>" +
+      (s.mode === "reprise" ? '<div class="bar" aria-hidden="true"><div style="width:' + Math.round(Math.min(s.level - 1, 15) / 15 * 100) + '%"></div></div><div class="row"><span class="muted">Reprise</span><span class="muted">Palier ' + Math.min(s.level, 15) + " / 15</span></div>" : "") + "</section>";
+  }
+  var days = E.diffDays(t, p.raceDate);
+  h += '<section class="card"><div class="row"><h2>Raid de l\'Archange</h2><span class="muted">' + (days >= 0 ? "J-" + days : "passé") + '</span></div><p class="muted">280 km · 3 étapes · ' + esc(E.monthYear(p.raceDate)) + (p.raceConfirmed ? "" : ", date à confirmer") + '</p><p>Charge optimale estimée : <strong>' + esc(E.monthYear(E.estimateOptimal(p, s, t))) + "</strong></p></section>";
+  var done = (DB.renfo[t] || []).filter(Boolean).length;
+  h += '<section class="card"><div class="row"><h2>Renfo tibia</h2><span class="muted">' + done + " / " + RENFO.length + ' aujourd\'hui</span></div><p class="muted">2 séances par semaine, 15 min.</p><button class="small" data-act="tab" data-tab="renfo">Ouvrir le renfo</button></section>';
+  return h;
+}
+
+function cap(x) { return x.charAt(0).toUpperCase() + x.slice(1); }
+
+function vJournal() {
+  var s = S(), t = today(), h = "";
+  if (!UI.draft) {
+    var ns = s.stopped ? null : E.nextSession(DB.profile, s, t);
+    UI.draft = { date: t, title: ns && ns.date <= t ? ns.title : (ns ? ns.title : "Séance libre"), level: ns && ns.level || null, during: 0, after: 0, morning: null, increasing: false, flags: [false, false, false], note: "", activity: null };
+  }
+  var d = UI.draft;
+  h += '<header class="hdr"><div><p class="muted">Après chaque séance, puis le lendemain matin</p><h1>Journal</h1></div></header>';
+  h += '<section class="card"><h2>Nouvelle séance</h2>' +
+    '<label class="field">Date<input type="date" id="dDate" value="' + esc(d.date) + '" max="' + t + '"></label>' +
+    '<label class="field">Séance<input type="text" id="dTitle" value="' + esc(d.title) + '"></label>' +
+    '<button class="small" data-act="fetchact"' + (ivReady() ? "" : " disabled") + '>Récupérer la sortie depuis Intervals.icu</button>' +
+    (UI.msg.act ? '<div class="notice ' + UI.msg.act.t + '">' + esc(UI.msg.act.m) + "</div>" : "") +
+    (d.activity ? '<div class="grid4">' + stat(d.activity.km, "km") + stat(d.activity.time, "durée") + stat(d.activity.hr || "—", "FC moy.") + stat(d.activity.load || "—", "charge") + "</div>" : "") +
+    "</section>";
+  h += '<section class="card"><h2>Douleur au tibia</h2>' +
+    slider("Pendant la séance", "during", d.during) + slider("Juste après", "after", d.after) +
+    '<label class="check"><input type="checkbox" id="mLater"' + (d.morning == null ? " checked" : "") + '>Je donnerai la note du lendemain matin plus tard</label>' +
+    (d.morning == null ? "" : slider("Le lendemain matin", "morning", d.morning)) +
+    '<label class="check"><input type="checkbox" id="dInc"' + (d.increasing ? " checked" : "") + ">La douleur a augmenté pendant la séance</label></section>";
+  h += '<section class="card"><h2>Signes d\'arrêt</h2>' +
+    ["Douleur précise sur un point de l'os", "Douleur la nuit ou au repos", "Boiterie à la marche"].map(function (lab, i) {
+      return '<label class="check"><input type="checkbox" data-flag="' + i + '"' + (d.flags[i] ? " checked" : "") + ">" + esc(lab) + "</label>";
+    }).join("") + '<p class="muted">Une seule case cochée : arrêt et avis médical.</p></section>';
+  h += '<section class="card"><label class="field">Note libre<textarea id="dNote" placeholder="Terrain, chaussures, sensations…">' + esc(d.note) + '</textarea></label>' +
+    '<div id="verdictBox">' + verdictHtml(d) + '</div><button class="primary" data-act="savelog">Enregistrer</button></section>';
+  var logs = s.logs.slice().reverse();
+  h += '<section class="card"><h2>Historique</h2>' + (logs.length ? logs.map(function (l) {
+    return '<div class="log"><div class="row"><strong style="font-size:14px">' + esc(cap(E.longDate(l.date))) + "</strong>" + chip(l._v, l._provisional) + '</div><span class="muted">' + esc(l.title) + " · pendant " + l.during + "/10 · après " + l.after + "/10 · matin " + (l.morning == null ? "—" : l.morning + "/10") + (l.activity ? " · " + esc(l.activity.km) + " km" : "") + "</span>" +
+      (l.note ? '<span class="muted">' + esc(l.note) + "</span>" : "") +
+      '<div class="btns">' + (l.morning == null ? '<button class="small" data-act="addmorning" data-id="' + l.id + '">Ajouter la note du matin</button>' : "") + '<button class="small" data-act="dellog" data-id="' + l.id + '">Supprimer</button></div></div>';
+  }).join("") : '<p class="muted">Aucune séance enregistrée.</p>') + "</section>";
+  return h;
+}
+function verdictHtml(d) { var v = E.verdict(d); return '<div class="row"><h2>Prévision</h2>' + chip(v, d.morning == null) + '</div><p class="muted">' + esc(explain(v, d.morning == null)) + "</p>"; }
+function stat(v, l) { return '<div class="stat"><b>' + esc(v) + "</b><span>" + esc(l) + "</span></div>"; }
+function slider(label, key, val) { return '<label class="field"><span class="row">' + esc(label) + ' <span class="val" id="o-' + key + '">' + val + '/10</span></span><input type="range" min="0" max="10" value="' + val + '" data-pain="' + key + '"></label>'; }
+function explain(v, prov) {
+  var m = { vert: "Séance validée. Deux vertes de suite : palier suivant.", orange: "Tu refais le même palier à la prochaine séance.", rouge: "Recul de 2 paliers et 48 h de repos.", stop: "Arrête la course et demande un avis médical." }[v];
+  return m + (prov && v !== "stop" ? " Confirmée après la note du lendemain matin." : "");
+}
+
+function vPlan() {
+  var s = S(), t = today(), p = DB.profile, h = "";
+  h += '<header class="hdr"><div><p class="muted">280 km · 3 étapes · ≈ 3 000 m D+</p><h1>Plan Raid</h1></div></header>';
+  var weeksRep = s.mode === "reprise" ? 13 : 0;
+  var ph = [["Reprise", 13], ["Base", 5], ["Constr.", 6], ["Pic", 3], ["Affût.", 3]];
+  var cur = s.mode === "reprise" ? 0 : null, plan = null, curWeek = null;
+  if (s.mode === "ultra") { plan = E.buildPlan(p, s); curWeek = plan.filter(function (w) { return w.monday <= t; }).pop() || plan[0]; cur = { Base: 1, Construction: 2, Pic: 3, "Affûtage": 4 }[curWeek.block]; }
+  h += '<section class="card"><div class="row"><h2>Phases</h2><span class="muted">→ ' + esc(E.monthYear(p.raceDate)) + '</span></div><div class="phases" aria-hidden="true">' + ph.map(function (x, i) { return '<div style="flex:' + x[1] + '" class="' + (i <= cur ? "on" : "") + '"></div>'; }).join("") + '</div><div class="plabels">' + ph.map(function (x) { return '<span style="flex:' + x[1] + '">' + x[0] + "</span>"; }).join("") + "</div>" +
+    '<p class="muted">' + (s.mode === "reprise" ? "Tu es en reprise, palier " + Math.min(s.level, 15) + " sur 15. Le plan Raid démarre après le test de passage." : "Semaine " + curWeek.i + " sur " + plan.length + " · bloc " + curWeek.block + ".") + "</p></section>";
+  if (s.mode === "reprise") {
+    var ps = E.passage(p, s, t);
+    h += '<section class="card"><h2>Test de passage</h2>' + ps.items.map(function (it) {
+      if (it.manual) return '<label class="check"><input type="checkbox" data-pass="' + it.k + '"' + (it.ok ? " checked" : "") + ">" + esc(it.label) + (it.required ? "" : " (facultatif)") + "</label>";
+      return '<div class="row" style="min-height:36px"><span style="font-size:14px">' + esc(it.label) + (it.detail ? '<br><span class="muted">' + esc(it.detail) + "</span>" : "") + "</span>" + (it.ok ? '<span class="chip vert">OK</span>' : '<span class="chip soft">À faire</span>') + "</div>";
+    }).join("") + '<button class="primary" data-act="switch"' + (ps.ready ? "" : " disabled") + ">Passer au plan Raid</button></section>";
+    h += '<section class="card"><h2>Paliers de reprise</h2>' + E.LEVELS.map(function (lv) {
+      var cls = lv.n < s.level ? "done" : lv.n === s.level ? "cur" : "";
+      return '<div class="lv ' + cls + '"><span class="n">' + lv.n + "</span><span>" + esc(lv.title) + '<br><span class="muted">' + E.PHASES[lv.phase] + "</span></span></div>";
+    }).join("") + "</section>";
+  } else {
+    h += '<section class="card"><h2>Semaines</h2>' + plan.map(function (w) {
+      var isCur = w === curWeek;
+      return '<details class="week' + (isCur ? " cur" : "") + '"' + (isCur ? " open" : "") + '><summary>S' + w.i + " · " + esc(cap(E.longDate(w.monday))) + " · " + w.block + " · " + w.hours + " h" + (w.light ? " (allégée)" : "") + "</summary>" +
+        w.sessions.map(function (x, j) {
+          var key = "w" + w.i + "s" + j; SESSIONS[key] = x;
+          return '<div class="sess"><span>' + esc(cap(E.longDate(x.date))) + "<br><span class=\"muted\">" + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><button class="small" data-act="send" data-key="' + key + '">Envoyer</button></div>' + msgHtml(key);
+        }).join("") + "</details>";
+    }).join("") + "</section>";
+  }
+  h += '<section class="card"><h2>Points de décision</h2><ol class="tl">' + GATES.map(function (g) {
+    var ok = g.k === "g1" ? !!p.switchDate : !!p.gates[g.k];
+    var late = !ok && t > g.date;
+    return '<li><span class="c' + (ok ? " done" : "") + '" aria-hidden="true"></span><div style="display:flex;flex-direction:column;gap:2px;flex:1"><span class="w">' + g.w + '</span><span style="font-size:14px">' + esc(g.c) + "</span>" +
+      (g.k === "g1" ? '<span class="muted">' + (ok ? "Validé" : "À venir") + "</span>" : '<label class="check"><input type="checkbox" data-gate="' + g.k + '"' + (ok ? " checked" : "") + ">Réussi</label>") +
+      (late ? '<span class="chip orange" style="align-self:flex-start">Non validé à temps</span>' : "") + "</div></li>";
+  }).join("") + '</ol><div class="notice">Point non validé : repli sur l\'étape 1 (83 km) ou La Barjo (80 km), même semaine. Vérifie auprès de l\'organisation si le changement de format est possible.</div></section>';
+  h += '<section class="card"><h2>Charge optimale</h2><p style="font-family:var(--head);font-weight:700;font-size:22px">' + esc(E.monthYear(E.estimateOptimal(p, s, t))) + '</p><p class="muted">Estimation recalculée après chaque séance : 8 à 10 h par semaine avec du D+.</p></section>';
+  return h;
+}
+
+function vRenfo() {
+  var t = today(), list = DB.renfo[t] || [], h = "";
+  var wk = E.mondayOf(t), count = 0;
+  for (var i = 0; i < 7; i++) { var dd = E.addDays(wk, i); if ((DB.renfo[dd] || []).some(Boolean)) count++; }
+  h += '<header class="hdr"><div><p class="muted">Mollets, releveurs du pied, pied</p><h1>Renfo tibia</h1></div></header>';
+  h += '<section class="card"><div class="row"><h2>Aujourd\'hui</h2><span class="muted">' + count + ' séance(s) cette semaine, objectif 2</span></div>' + RENFO.map(function (r, i) {
+    return '<label class="check" style="align-items:flex-start"><input type="checkbox" data-renfo="' + i + '"' + (list[i] ? " checked" : "") + ' style="margin-top:2px"><span><strong style="font-weight:600">' + esc(r.t) + '</strong><br><span class="muted">' + esc(r.d) + "</span></span></label>";
+  }).join("") + '<p class="muted">Sans douleur. Si un exercice réveille la douleur du tibia, saute-le aujourd\'hui.</p></section>';
+  return h;
+}
+
+function vSettings() {
+  var p = DB.profile, h = "";
+  h += '<header class="hdr"><div><p class="muted">NaqRun</p><h1>Réglages</h1></div><button class="small" data-act="tab" data-tab="today">Fermer</button></header>';
+  h += '<section class="card"><h2>Intervals.icu</h2><p class="muted">Pour envoyer les séances sur ta Fenix : dans Intervals.icu, Settings › Connections › Garmin Connect, coche « Upload planned workouts ». Puis copie ton identifiant d\'athlète et ta clé API (Settings › Developer Settings). Ils restent uniquement sur ce téléphone.</p>' +
+    '<label class="field">Identifiant d\'athlète<input type="text" id="ivId" value="' + esc(p.intervalsId) + '" placeholder="i123456" autocapitalize="off" autocomplete="off"></label>' +
+    '<label class="field">Clé API<input type="password" id="ivKey" value="' + esc(p.intervalsKey) + '" autocomplete="off"></label>' +
+    '<button class="small" data-act="ivtest">Enregistrer et tester la connexion</button>' + (UI.msg.iv ? '<div class="notice ' + UI.msg.iv.t + '">' + esc(UI.msg.iv.m) + "</div>" : "") + "</section>";
+  h += '<section class="card"><h2>Programme</h2>' +
+    '<label class="field">Palier de départ<select id="startLevel">' + E.LEVELS.map(function (lv) { return '<option value="' + lv.n + '"' + (lv.n === p.startLevel ? " selected" : "") + ">" + lv.n + " · " + esc(lv.title) + "</option>"; }).join("") + "</select></label>" +
+    '<label class="field">Date du Raid<input type="date" id="raceDate" value="' + esc(p.raceDate) + '"></label>' +
+    '<label class="check"><input type="checkbox" id="raceConfirmed"' + (p.raceConfirmed ? " checked" : "") + ">Date officielle confirmée</label>" +
+    '<label class="field">Volume maximal visé (heures par semaine)<input type="number" id="peakHours" min="6" max="16" step="0.5" value="' + p.peakHours + '"></label>' +
+    (p.switchDate ? '<button class="small" data-act="unswitch">Revenir en mode reprise</button>' : "") +
+    "</section>";
+  h += '<section class="card"><h2>Sauvegarde</h2><p class="muted">Tes données sont sur ce téléphone. Copie la sauvegarde de temps en temps (dans Notes, par exemple) ; tu pourras la recoller ici.</p><div class="btns"><button class="small" data-act="export">Copier la sauvegarde</button><button class="small" data-act="import">Coller une sauvegarde</button></div>' + (UI.msg.bk ? '<div class="notice ' + UI.msg.bk.t + '">' + esc(UI.msg.bk.m) + "</div>" : "") + '<textarea id="bkText" class="' + (UI.showImport ? "" : "sr") + '" placeholder="Colle ta sauvegarde ici puis touche Importer"></textarea>' + (UI.showImport ? '<button class="small" data-act="doimport">Importer</button>' : "") + "</section>";
+  h += '<section class="card"><p class="muted">NaqRun ne remplace pas un avis médical. Si ton kiné t\'a donné d\'autres seuils de douleur, ils priment.</p></section>';
+  return h;
+}
+
+// ---------- Rendu et événements ----------
+function render() {
+  SESSIONS = {};
+  var v = { today: vToday, journal: vJournal, plan: vPlan, renfo: vRenfo, settings: vSettings }[UI.tab] || vToday;
+  document.getElementById("app").innerHTML = v();
+  document.querySelectorAll("nav.tabs button").forEach(function (b) { if (b.dataset.tab === UI.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+}
+function go(tab) { UI.tab = tab; try { history.replaceState(null, "", "#" + tab); } catch (e) {} render(); window.scrollTo(0, 0); }
+
+document.addEventListener("click", function (ev) {
+  var b = ev.target.closest("[data-act],[data-tab]"); if (!b) return;
+  if (b.closest("nav.tabs")) { go(b.dataset.tab); return; }
+  var a = b.dataset.act, s, t = today();
+  if (a === "tab") return go(b.dataset.tab);
+  if (a === "settings") return go("settings");
+  if (a === "welcome") { DB.profile._welcomed = true; save(); return render(); }
+  if (a === "send") return sendSession(SESSIONS[b.dataset.key], b.dataset.key);
+  if (a === "copy") return copySession(SESSIONS[b.dataset.key] || E.nextSession(DB.profile, S(), t), b.dataset.key);
+  if (a === "tolog") { UI.draft = null; return go("journal"); }
+  if (a === "clearstop") { DB.profile.clearedStop = t; save(); return render(); }
+  if (a === "morning") { var l = DB.logs.find(function (x) { return x.id === b.dataset.id; }); if (l) { l.morning = +document.getElementById("morningQuick").value; save(); } return render(); }
+  if (a === "addmorning") { var l2 = DB.logs.find(function (x) { return x.id === b.dataset.id; }); var val = prompt("Douleur au réveil, de 0 à 10 :", "0"); if (l2 && val != null && val !== "" && !isNaN(+val)) { l2.morning = Math.max(0, Math.min(10, Math.round(+val))); save(); } return render(); }
+  if (a === "dellog") { if (confirm("Supprimer cette séance du journal ?")) { DB.logs = DB.logs.filter(function (x) { return x.id !== b.dataset.id; }); save(); } return render(); }
+  if (a === "savelog") {
+    var d = UI.draft; readDraft();
+    if (!d.date || d.date > t) { alert("Choisis une date passée ou aujourd'hui."); return; }
+    var rec = Object.assign({}, d, { id: String(Date.now()), title: d.title || "Séance" });
+    DB.logs.push(rec); save(); UI.draft = null;
+    var v = E.verdict(rec);
+    UI.msg.act = null;
+    go(v === "stop" ? "today" : "today");
+    return;
+  }
+  if (a === "fetchact") {
+    readDraft();
+    var dd = UI.draft.date; UI.msg.act = { t: "", m: "Recherche de la sortie…" }; render();
+    ivFetch("/activities?oldest=" + dd + "&newest=" + dd).then(function (list) {
+      var runs = (list || []).filter(function (x) { return /Run|Hike|Walk/.test(x.type || ""); });
+      if (!runs.length) { UI.msg.act = { t: "err", m: "Aucune sortie trouvée ce jour-là dans Intervals.icu (la synchro Garmin peut prendre quelques minutes)." }; return render(); }
+      var r = runs[0], sec = r.moving_time || r.elapsed_time || 0;
+      UI.draft.activity = { km: ((r.distance || 0) / 1000).toFixed(2).replace(".", ","), time: Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"), hr: r.average_heartrate ? Math.round(r.average_heartrate) : null, load: r.icu_training_load != null ? Math.round(r.icu_training_load) : null, name: r.name || "" };
+      UI.msg.act = { t: "ok", m: "Sortie récupérée : " + (r.name || "course") + "." }; render();
+    }).catch(function (e) { UI.msg.act = { t: "err", m: ivError(e) }; render(); });
+    return;
+  }
+  if (a === "switch") { if (confirm("Passer au plan Raid à partir d'aujourd'hui ?")) { DB.profile.switchDate = t; save(); } return render(); }
+  if (a === "unswitch") { if (confirm("Revenir en mode reprise ? Le plan Raid sera recalculé au prochain passage.")) { DB.profile.switchDate = null; save(); } return render(); }
+  if (a === "ivtest") {
+    DB.profile.intervalsId = document.getElementById("ivId").value.trim();
+    DB.profile.intervalsKey = document.getElementById("ivKey").value.trim(); save();
+    if (!ivReady()) { UI.msg.iv = { t: "err", m: "Renseigne les deux champs." }; return render(); }
+    UI.msg.iv = { t: "", m: "Test en cours…" }; render();
+    ivFetch("").then(function (ath) { UI.msg.iv = { t: "ok", m: "Connecté à Intervals.icu" + (ath && ath.name ? " : " + ath.name : "") + "." }; render(); })
+      .catch(function (e) { UI.msg.iv = { t: "err", m: ivError(e) }; render(); });
+    return;
+  }
+  if (a === "export") {
+    var txt = JSON.stringify(Object.assign({}, DB, { profile: Object.assign({}, DB.profile, { intervalsKey: "" }) }));
+    var ok = function () { UI.msg.bk = { t: "ok", m: "Sauvegarde copiée (sans ta clé API)." }; render(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function () { prompt("Copie ce texte :", txt); }); else prompt("Copie ce texte :", txt);
+    return;
+  }
+  if (a === "import") { UI.showImport = true; return render(); }
+  if (a === "doimport") {
+    try { var x = JSON.parse(document.getElementById("bkText").value); if (!x.profile || !Array.isArray(x.logs)) throw 0; var key = DB.profile.intervalsKey; DB = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), x); DB.profile = Object.assign({}, DEFAULT.profile, x.profile, { intervalsKey: x.profile.intervalsKey || key }); save(); UI.showImport = false; UI.msg.bk = { t: "ok", m: "Sauvegarde importée." }; }
+    catch (e) { UI.msg.bk = { t: "err", m: "Ce texte n'est pas une sauvegarde NaqRun valide." }; }
+    return render();
+  }
+});
+
+function readDraft() {
+  var d = UI.draft; if (!d) return;
+  var el = function (id) { return document.getElementById(id); };
+  if (el("dDate")) d.date = el("dDate").value;
+  if (el("dTitle")) d.title = el("dTitle").value;
+  if (el("dNote")) d.note = el("dNote").value;
+}
+
+document.addEventListener("input", function (ev) {
+  var t = ev.target;
+  if (t.id === "morningQuick") { document.getElementById("mv").textContent = t.value + "/10"; return; }
+  if (t.dataset.pain && UI.draft) { UI.draft[t.dataset.pain] = +t.value; document.getElementById("o-" + t.dataset.pain).textContent = t.value + "/10"; refreshVerdict(); return; }
+});
+document.addEventListener("change", function (ev) {
+  var t = ev.target, p = DB.profile;
+  if (t.id === "mLater") { readDraft(); UI.draft.morning = t.checked ? null : 0; return render(); }
+  if (t.id === "dInc") { UI.draft.increasing = t.checked; return refreshVerdict(); }
+  if (t.dataset.flag != null && UI.draft) { UI.draft.flags[+t.dataset.flag] = t.checked; return refreshVerdict(); }
+  if (t.dataset.pass) { p[t.dataset.pass] = t.checked; save(); return render(); }
+  if (t.dataset.gate) { p.gates[t.dataset.gate] = t.checked; save(); return render(); }
+  if (t.dataset.renfo != null) { var d = today(); DB.renfo[d] = DB.renfo[d] || []; DB.renfo[d][+t.dataset.renfo] = t.checked; save(); return render(); }
+  if (t.id === "startLevel") { p.startLevel = +t.value; save(); return; }
+  if (t.id === "raceDate" && t.value) { p.raceDate = t.value; save(); return; }
+  if (t.id === "raceConfirmed") { p.raceConfirmed = t.checked; save(); return; }
+  if (t.id === "peakHours") { p.peakHours = Math.max(6, Math.min(16, +t.value || 10)); save(); return; }
+  if (t.id === "dDate" || t.id === "dTitle" || t.id === "dNote") { readDraft(); return; }
+});
+function refreshVerdict() { readDraft(); var b = document.getElementById("verdictBox"); if (b && UI.draft) b.innerHTML = verdictHtml(UI.draft); }
+
+window.addEventListener("hashchange", function () { var h = location.hash.slice(1); if (h && h !== UI.tab) { UI.tab = h; render(); } });
+render();
+if ("serviceWorker" in navigator && location.protocol === "https:") { navigator.serviceWorker.register("sw.js").catch(function () {}); }
+</script>
+</body>
+</html>
