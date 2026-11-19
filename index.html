@@ -47,12 +47,14 @@ h3{margin:0;font-family:var(--head);font-weight:700;font-size:15px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--text)}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}.tbl th,.tbl td{text-align:left;padding:8px 4px;border-bottom:1px solid var(--border)}.tbl th{color:var(--muted);font-weight:500}.tbl tr:last-child td{border-bottom:none}
 .readout{min-height:20px}
+.tipbox{position:fixed;z-index:30;display:none;pointer-events:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;line-height:1.35;max-width:240px;box-shadow:0 4px 14px rgba(0,0,0,.5)}
 input[type=range].pain{-webkit-appearance:none;appearance:none;height:16px;border-radius:999px;margin:8px 0;background:linear-gradient(90deg,#3FBF6F 0%,#C9D94A 40%,#FFC247 60%,#FF7A1A 80%,#E5483D 100%);outline-offset:6px}
 input[type=range].pain::-webkit-slider-thumb{-webkit-appearance:none;width:34px;height:34px;border-radius:50%;background:var(--c,#3FBF6F);border:4px solid #F2F2F0;box-shadow:0 1px 5px rgba(0,0,0,.6)}
 input[type=range].pain::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--c,#3FBF6F);border:4px solid #F2F2F0;box-shadow:0 1px 5px rgba(0,0,0,.6)}
 .pv{font-weight:500}.pv b{font-weight:700}
 button.opt{flex-direction:column;align-items:flex-start;gap:2px;text-align:left;min-height:56px;padding:8px 14px;width:100%}
 button.opt span{font-size:12px;font-weight:400;color:var(--muted)}
+.sessd{border-left:4px solid var(--kc,var(--border));padding-left:12px;margin-left:0;background:linear-gradient(90deg,color-mix(in srgb,var(--kc,transparent) 10%,transparent),transparent 60%);border-radius:0 8px 8px 0}
 .dayblock{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:4px}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-h span{text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase}
@@ -60,6 +62,7 @@ button.opt span{font-size:12px;font-weight:400;color:var(--muted)}
 .day b{font-size:14px;font-weight:600}.day.out{opacity:.35}.day.today{border-color:var(--accent)}.day.sel{background:var(--soft)}
 .day .dots{display:flex;gap:3px;min-height:8px}.day .dots i{width:8px;height:8px;border-radius:50%;box-sizing:border-box;border:2px solid currentColor;background:transparent}
 .day .dots i.done{background:currentColor}.day .ct{display:none}
+.day.rest b{color:var(--g)}.day.rest{background:color-mix(in srgb,var(--g) 8%,var(--surface2))}
 .kv{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:32px;font-size:14px}
 .kv>span:first-child{color:var(--muted)}.kv>b{font-weight:600;text-align:right}
 .seg{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px}
@@ -343,7 +346,7 @@ function weekList(sessions, prefix, nodate) {
     else if (x.missed) st = ' <span class="chip soft">Non faite</span>';
     else if (x.autoMoved) st = ' <span class="chip jaune">Décalée</span>';
     else if (x.kind === "velo" && x.date < t && ACTS.list) st = actsOn(x.date).some(function (a) { return !a.run; }) ? ' <span class="chip vert">Faite</span>' : ' <span class="chip soft">Non faite</span>';
-    return '<details class="sessd" data-key="' + key + '"' + (open ? " open" : "") + '><summary class="sess"><span>' + (nodate ? '<strong>' + esc(x.title) + '</strong>' : esc(cap(E.longDate(x.date)))) + (x.manual ? " (reportée)" : "") + st + '<br><span class="muted">' + (nodate ? esc(KINDS[x.kind] || x.kind) : esc(x.title)) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><span class="chev" aria-hidden="true">›</span></summary>' +
+    return '<details class="sessd" data-key="' + key + '" style="--kc:' + (KCOL[x.kind] || "var(--accent)") + '"' + (open ? " open" : "") + '><summary class="sess"><span>' + (nodate ? '<strong>' + esc(x.title) + '</strong>' : esc(cap(E.longDate(x.date)))) + (x.manual ? " (reportée)" : "") + st + '<br><span class="muted">' + (nodate ? esc(KINDS[x.kind] || x.kind) : esc(x.title)) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><span class="chev" aria-hidden="true">›</span></summary>' +
       '<div class="sessbody"><span class="chip soft" style="align-self:flex-start">' + esc(KINDS[x.kind] || x.kind) + "</span>" + stepsHtml(x.blocks) + (x.note ? '<div class="notice">' + esc(x.note) + "</div>" : "") +
       '<button class="small primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix</button>" + msgHtml(key) + (x.kind !== "velo" && x.date <= today() && !DB.logs.some(function (l) { return l.date === x.date; }) ? '<button class="small" data-act="finish" data-key="' + key + '">J\'ai terminé cette séance</button>' : "") + moveHtml(x, key) + "</div></details>";
   }).join("");
@@ -429,12 +432,17 @@ function vJournal() {
   }).join("") : '<p class="muted">Aucune séance enregistrée. Après une séance, touche « J\'ai terminé la séance » dans Aujourd\'hui.</p>') + "</section>";
 }
 function vFinish() {
-  var t = today(), d = UI.draft, h = "";
-  h += hdr(esc(d.free ? "Sortie hors plan" : cap(E.longDate(d.date))), "Séance terminée", '<button class="small" data-act="finishcancel">Annuler</button>');
-  h += '<section class="card"><h2>' + (d.free ? "La sortie" : esc(d.title)) + "</h2>" +
-    (d.free ? '<label class="field">Date<input type="date" id="dDate" value="' + esc(d.date) + '" max="' + t + '"></label>' +
+  var t = today(), d = UI.draft, h = "", sub = UI.sub.finish || "feel";
+  h += hdr(esc(cap(E.longDate(d.date))), "Séance terminée", '<button class="small" data-act="finishcancel">Annuler</button>');
+  h += seg("finish", [["feel", "Ressenti"], ["set", "Réglage de la séance"]], sub);
+  if (sub === "set") {
+    return h + '<section class="card"><h2>Réglage de la séance</h2><p class="muted">Corrige ici ce qui ne correspond pas à ce que tu as réellement fait.</p>' +
+      '<label class="field">Date<input type="date" id="dDate" value="' + esc(d.date) + '" max="' + t + '"></label>' +
       '<label class="field">Type<select id="dKind">' + Object.keys(KINDS).filter(function (k) { return k !== "velo"; }).map(function (k) { return '<option value="' + k + '"' + (k === d.kind ? " selected" : "") + ">" + KINDS[k] + "</option>"; }).join("") + "</select></label>" +
-      '<label class="field">Intitulé<input type="text" id="dTitle" value="' + esc(d.title) + '" placeholder="Ex. 40 min continu"></label>' : "") +
+      '<label class="field">Intitulé<input type="text" id="dTitle" value="' + esc(d.title) + '" placeholder="Ex. 40 min continu"></label>' +
+      '<button class="primary" data-act="seg" data-g="finish" data-v="feel">Valider et revenir au ressenti</button></section>';
+  }
+  h += '<section class="card"><div class="row"><h2>' + esc(d.title || KINDS[d.kind] || "Sortie") + '</h2><span class="chip soft">' + esc(KINDS[d.kind] || "Course") + "</span></div>" +
     '<button class="small" data-act="fetchact"' + (ivReady() ? "" : " disabled") + ">Récupérer la sortie depuis Intervals.icu</button>" +
     (UI.msg.act ? '<div class="notice ' + UI.msg.act.t + '">' + esc(UI.msg.act.m) + "</div>" : "") +
     (d.activity ? '<div class="grid4">' + stat(d.activity.km, "km") + stat(d.activity.time, "durée") + stat(d.activity.hr || "—", "FC moy.") + stat(d.activity.cad || "—", "cadence") + "</div>" + (d.activity.cad && d.activity.cad < 165 ? '<div class="notice">Cadence sous 165 pas/min : vise des pas plus courts et plus rapides.</div>' : "") +
@@ -442,19 +450,19 @@ function vFinish() {
       (d.activity.decoupling != null && d.activity.decoupling > 5 ? '<div class="notice">Dérive cardiaque au-dessus de 5 % : ton cœur a dû monter en fin de séance. Reste en bas de zone 2 la prochaine fois.</div>' : "") : "") +
     '<div class="grp"><label class="field"><span class="row">Effort ressenti ' + (d.rpe == null ? '<span class="pv" id="o-rpe">—</span>' : painVal("o-rpe", d.rpe, "rpe")) + '</span><input type="range" class="pain" min="0" max="10" value="' + (d.rpe == null ? 3 : d.rpe) + '" data-pain="rpe" style="--c:' + painColor(d.rpe == null ? 3 : d.rpe) + '"></label><p class="muted">Une séance facile devrait rester entre 2 et 4. À 6 ou plus, elle ne fait pas monter de palier.</p></div></section>';
   h += '<section class="card"><h2>Douleur au tibia</h2>' + slider("Pendant la séance", "during", d.during) + slider("Juste après", "after", d.after) +
-    '<label class="check"><input type="checkbox" id="mLater"' + (d.morning == null ? " checked" : "") + ">Je donnerai la note du lendemain matin plus tard</label>" +
-    (d.morning == null ? "" : slider("Le lendemain matin", "morning", d.morning)) +
+    '<label class="check"><input type="checkbox" id="dLater"' + (d.later ? " checked" : "") + ">J'ai eu des douleurs plus tard</label>" +
+    (d.later ? slider("Douleur plus tard", "laterVal", d.laterVal == null ? 3 : d.laterVal) : "") +
     '<label class="check"><input type="checkbox" id="dInc"' + (d.increasing ? " checked" : "") + ">La douleur a augmenté pendant la séance</label>" +
     '<label class="check"><input type="checkbox" id="dGait"' + (d.gait ? " checked" : "") + ">Ma foulée a changé à cause de la douleur</label>" +
-    '<div class="grp"><h3>Signes d\'arrêt</h3>' + ["Douleur précise sur un point de l'os (moins de 5 cm)", "Douleur la nuit ou au repos", "Boiterie à la marche"].map(function (lab, i) {
-      return '<label class="check"><input type="checkbox" data-flag="' + i + '"' + (d.flags[i] ? " checked" : "") + ">" + esc(lab) + "</label>";
-    }).join("") + '<p class="muted">Une seule case cochée : arrêt et avis médical.</p></div></section>';
+    '<p class="muted">Douleur précise sur un point de l\'os, douleur la nuit ou au repos, boiterie : arrête de courir et demande un avis médical. Tu me donneras la note du lendemain matin dans Aujourd\'hui.</p></section>';
   h += '<section class="card"><label class="field">Note libre<textarea id="dNote" placeholder="Terrain, chaussures, sensations…">' + esc(d.note) + '</textarea></label><div class="grp" id="verdictBox">' + verdictHtml(d) + '</div><button class="primary" data-act="savelog">Enregistrer</button></section>';
   return h;
 }
 function stat(v, l) { return '<div class="stat"><b>' + esc(v) + "</b><span>" + esc(l) + "</span></div>"; }
 function slider(label, key, val) { return '<label class="field"><span class="row">' + esc(label) + " " + painVal("o-" + key, val, "pain") + '</span><input type="range" class="pain" min="0" max="10" value="' + val + '" data-pain="' + key + '" style="--c:' + painColor(val) + '"></label>'; }
+function effDraft(d) { return Object.assign({}, d, { after: d.later ? Math.max(d.after, d.laterVal == null ? 3 : d.laterVal) : d.after }); }
 function verdictHtml(d) {
+  d = effDraft(d);
   var prev = S().logs.filter(function (l) { return l.date <= d.date; }).pop();
   var v = E.verdictInContext(d, prev ? prev._v : null), prov = d.morning == null;
   var counts = d.kind === "palier" || ((DB.profile.rythme === "dynamique" || DB.profile.rythme === "limite") && d.kind === "cadence");
@@ -496,7 +504,7 @@ function vPlanWeek() {
       (E.isConsolidation(p, mon) ? '<div class="notice">Semaine de consolidation : volume réduit d’environ 25 %, pas de montée de palier.</div>' : "");
     for (var di = 0; di < 7; di++) {
       var dd = E.addDays(mon, di), ds = lst.filter(function (x) { return x.date === dd; });
-      h += '<div class="dayblock"><div class="row"><h3>' + esc(cap(E.longDate(dd))) + "</h3>" + (dd === t ? '<span class="chip soft">Aujourd\'hui</span>' : "") + "</div>" + (ds.length ? weekList(ds, "wk" + di + "d", true) : '<p class="muted">Repos</p>') + "</div>";
+      h += '<div class="dayblock"><div class="row"><h3>' + esc(cap(E.longDate(dd))) + "</h3>" + (dd === t ? '<span class="chip soft">Aujourd\'hui</span>' : "") + (ds.length ? "" : '<span class="chip vert">Repos</span>') + "</div>" + (ds.length ? weekList(ds, "wk" + di + "d", true) : "") + "</div>";
     }
     h += '<p class="muted">Seul le footing progression fait monter de palier, de 10 % au plus. Une semaine sur quatre est une semaine de consolidation. Les semaines à venir suivent ton palier actuel et s\'ajustent à chaque séance.</p></section>';
     if (off === 0 && ACTS.list) {
@@ -639,12 +647,13 @@ function gridSvg(max, min) {
 function barChart(items, max) {
   var n = items.length, pw = VW - PL - PR, col = pw / n, bw = Math.min(22, col - 6), ph = VH - PT - PB, g = gridSvg(max);
   items.forEach(function (it, i) {
-    var x = PL + col * i + (col - bw) / 2, h = Math.max(it.v ? 2 : 0, it.v / max * ph), y = PT + ph - h;
-    g += '<rect x="' + x + '" y="' + y + '" width="' + bw + '" height="' + h + '" rx="3" fill="' + (it.cur ? "var(--accent)" : "var(--accent-dim)") + '"></rect>';
-    if (i % 2 === (n - 1) % 2) g += '<text x="' + (x + bw / 2) + '" y="' + (VH - 6) + '" text-anchor="middle" font-size="10" fill="var(--muted)">' + esc(it.label) + "</text>";
+    var x = PL + col * i + (col - bw) / 2, ha = it.a / max * ph, hb = it.b / max * ph, ya = PT + ph - ha, yb = ya - hb - (it.b && it.a ? 2 : 0);
+    if (it.a) g += '<rect x="' + x + '" y="' + ya + '" width="' + bw + '" height="' + Math.max(2, ha) + '" rx="3" fill="var(--accent)"></rect>';
+    if (it.b) g += '<rect x="' + x + '" y="' + yb + '" width="' + bw + '" height="' + Math.max(2, hb) + '" rx="3" fill="var(--s1)"></rect>';
+    if (i % 2 === (n - 1) % 2) g += '<text x="' + (x + bw / 2) + '" y="' + (VH - 6) + '" text-anchor="middle" font-size="10" fill="' + (it.cur ? "var(--text)" : "var(--muted)") + '"' + (it.cur ? ' font-weight="700"' : "") + ">" + esc(it.label) + "</text>";
     g += '<rect x="' + (PL + col * i) + '" y="' + PT + '" width="' + col + '" height="' + ph + '" fill="transparent" data-tip="' + esc(it.tip) + '"></rect>';
   });
-  return '<svg viewBox="0 0 ' + VW + " " + VH + '" role="img" aria-label="Histogramme">' + g + "</svg>";
+  return '<svg viewBox="0 0 ' + VW + " " + VH + '" role="img" aria-label="Histogramme empilé">' + g + "</svg>";
 }
 function lineChart(series, max, refs, label, min) {
   min = min || 0;
@@ -676,19 +685,22 @@ function vData() {
   if (ivReady() && !DATA.list && !DATA.err) h += '<p class="muted">Chargement de tes sorties…</p>';
   if (DATA.err) h += '<div class="notice err">Impossible de lire Intervals.icu : les chiffres ci-dessous viennent seulement de ton journal.</div>';
   else if (!DATA.list && DB.logs.length) h += '<div class="notice">Pour l\'instant, ces chiffres viennent de ton journal.</div>';
-  // semaines
+  // semaines : course + autres activités (vélo, rando…) = temps cumulé des séances
+  var others = DATA.list ? DATA.list.filter(function (x) { return !x.run; }) : [];
   var weeks = [];
   for (var i = 9; i >= 0; i--) {
     var m0 = E.addDays(monday, -7 * i), m1 = E.addDays(m0, 6);
-    var tot = runs.filter(function (r) { return r.date >= m0 && r.date <= m1; }).reduce(function (u, r) { return u + r.min; }, 0);
-    weeks.push({ label: shortDate(m0), v: tot, cur: i === 0, tip: "Semaine du " + E.longDate(m0) + " : " + hm(tot) + " de course" });
+    var run = runs.filter(function (r) { return r.date >= m0 && r.date <= m1; }).reduce(function (u, r) { return u + r.min; }, 0);
+    var oth = others.filter(function (r) { return r.date >= m0 && r.date <= m1; }).reduce(function (u, r) { return u + r.min; }, 0);
+    weeks.push({ label: shortDate(m0), v: run, a: run, b: oth, tot: run + oth, cur: i === 0, tip: "Semaine du " + E.longDate(m0) + " : " + hm(run + oth) + " au total (course " + hm(run) + (oth ? ", autres " + hm(oth) : "") + ")" });
   }
-  var prev4 = weeks.slice(5, 9).reduce(function (u, w) { return u + w.v; }, 0) / 4;
+  var prev4 = weeks.slice(5, 9).reduce(function (u, w) { return u + w.a; }, 0) / 4;
   var since30 = E.addDays(t, -30), longest = runs.filter(function (r) { return r.date >= since30; }).reduce(function (u, r) { return Math.max(u, r.min); }, 0);
-  h += '<section class="card"><h2>En un coup d\'œil</h2><div class="grid4">' + stat(hm(weeks[9].v), "cette semaine") + stat(hm(prev4), "moyenne 4 semaines") + stat(longest ? hm(longest) : "—", "plus longue sortie, 30 j") + stat(longest ? hm(Math.round(longest * 1.1)) : "—", "plafond de la prochaine") + '</div><p class="muted">Le plafond est 110 % de ta plus longue sortie des 30 derniers jours : au-delà, le risque de blessure monte.</p></section>';
+  h += '<section class="card"><h2>En un coup d\'œil</h2><div class="grid4">' + stat(hm(weeks[9].a), "course cette semaine") + stat(hm(prev4), "moyenne 4 semaines") + stat(longest ? hm(longest) : "—", "plus longue sortie, 30 j") + stat(longest ? hm(Math.round(longest * 1.1)) : "—", "plafond de la prochaine") + '</div><p class="muted">Le plafond est 110 % de ta plus longue sortie des 30 derniers jours : au-delà, le risque de blessure monte.</p></section>';
   // volume
-  var max = niceMax(Math.max.apply(null, weeks.map(function (w) { return w.v; }).concat([30])));
-  h += chartCard("Volume par semaine", "Minutes de course, 10 dernières semaines", barChart(weeks, max), tbl(["Semaine du", "Course"], weeks.slice().reverse().map(function (w) { return [w.label, hm(w.v)]; })));
+  var max = niceMax(Math.max.apply(null, weeks.map(function (w) { return w.tot; }).concat([30]))), hasOth = weeks.some(function (w) { return w.b; });
+  h += chartCard("Volume par semaine", "Temps de séances cumulé, 10 dernières semaines, en minutes", (hasOth ? legend([["Course", "var(--accent)"], ["Vélo et autres", "var(--s1)"]]) : "") + barChart(weeks, max) + '<p class="muted">Cette semaine : <strong style="color:var(--text)">' + hm(weeks[9].tot) + "</strong> de séances au total" + (weeks[9].b ? " (course " + hm(weeks[9].a) + ")" : "") + ".</p>",
+    tbl(["Semaine du", "Course", "Autres", "Total"], weeks.slice().reverse().map(function (w) { return [w.label, hm(w.a), hm(w.b), hm(w.tot)]; })));
   // douleur
   var logs = s.logs.slice(-12);
   if (logs.length) {
@@ -745,12 +757,12 @@ function vCalendar() {
   for (var i = 0; i < 42; i++) {
     var d = E.addDays(start, i);
     if (i >= 35 && d.slice(0, 7) !== ym) break;
-    var list = map[d] || [], out = d.slice(0, 7) !== ym;
+    var list = map[d] || [], out = d.slice(0, 7) !== ym, isRest = !list.length && d >= t && d <= E.addDays(t, 280);
     var dots = list.slice(0, 3).map(function (x) { return '<i style="color:' + ((x.past || x.done) && VCOL[x.v] ? VCOL[x.v] : x.past ? "var(--muted)" : KCOL[x.kind] || "var(--accent)") + '"' + (x.done || x.past ? ' class="done"' : "") + "></i>"; }).join("");
     var tt = list.filter(function (x) { return !x.past; }).slice(0, 2).map(function (x) { return '<span class="ct">' + esc(x.title.replace(/ · .*/, "")) + "</span>"; }).join("");
-    h += '<button class="day' + (out ? " out" : "") + (d === t ? " today" : "") + (d === sel ? " sel" : "") + '" data-act="calday" data-d="' + d + '" aria-label="' + esc(E.longDate(d)) + '"><b>' + +d.slice(8) + '</b><span class="dots">' + dots + "</span>" + tt + "</button>";
+    h += '<button class="day' + (isRest ? " rest" : "") + (out ? " out" : "") + (d === t ? " today" : "") + (d === sel ? " sel" : "") + '" data-act="calday" data-d="' + d + '" aria-label="' + esc(E.longDate(d)) + '"><b>' + +d.slice(8) + '</b><span class="dots">' + dots + "</span>" + tt + "</button>";
   }
-  h += "</div>" + legend([["Course", "var(--accent)"], ["Rando / sortie longue", "var(--s3)"], ["Vélo", "var(--s1)"]]) + '<p class="muted">Un point plein = séance faite. Les séances à venir suivent ton palier actuel et se recalculent à chaque saisie.</p></section>';
+  h += "</div>" + legend([["Course", "var(--accent)"], ["Rando / sortie longue", "var(--s3)"], ["Vélo", "var(--s1)"], ["Repos", "var(--g)"]]) + '<p class="muted">Un point plein = séance faite. Les séances à venir suivent ton palier actuel et se recalculent à chaque saisie.</p></section>';
   var dl = (map[sel] || []);
   var plan = dl.filter(function (x) { return !x.past; }), past = dl.filter(function (x) { return x.past; });
   h += '<section class="card"><h2>' + esc(cap(E.longDate(sel))) + "</h2>";
@@ -762,7 +774,7 @@ function vCalendar() {
 
 // ---------- Rendu et événements ----------
 function render() {
-  SESSIONS = {};
+  SESSIONS = {}; if (typeof hideTip === "function") hideTip();
   if (UI.tab === "today" || UI.tab === "plan") loadActs(false);
   if (UI.tab === "data") loadData();
   var v = { today: vToday, journal: vJournal, plan: vPlan, data: vData, settings: vSettings }[UI.tab] || vToday;
@@ -799,6 +811,21 @@ function fetchAct() {
     UI.msg.act = { t: "ok", m: "Sortie récupérée : " + (r.name || "course") + "." }; render();
   }).catch(function (e) { UI.msg.act = { t: "err", m: ivError(e) }; render(); });
 }
+var TIP = null;
+function showTip(el, x, y) {
+  if (!TIP) { TIP = document.createElement("div"); TIP.className = "tipbox"; document.body.appendChild(TIP); }
+  TIP.textContent = el.dataset.tip; TIP.style.display = "block";
+  var w = TIP.offsetWidth, left = Math.max(8, Math.min(window.innerWidth - w - 8, x - w / 2));
+  TIP.style.left = left + "px"; TIP.style.top = Math.max(8, y - TIP.offsetHeight - 14) + "px";
+}
+function hideTip() { if (TIP) TIP.style.display = "none"; }
+document.addEventListener("mouseover", function (ev) { var el = ev.target.closest && ev.target.closest(".chart [data-tip]"); if (el) showTip(el, ev.clientX, ev.clientY); });
+document.addEventListener("mousemove", function (ev) { var el = ev.target.closest && ev.target.closest(".chart [data-tip]"); if (el) showTip(el, ev.clientX, ev.clientY); else hideTip(); });
+document.addEventListener("mouseout", function (ev) { if (!ev.relatedTarget || !(ev.relatedTarget.closest && ev.relatedTarget.closest(".chart [data-tip]"))) hideTip(); });
+document.addEventListener("click", function (ev) {
+  var tp = ev.target.closest && ev.target.closest(".chart [data-tip]");
+  if (tp) { showTip(tp, ev.clientX, ev.clientY); clearTimeout(showTip.t); showTip.t = setTimeout(hideTip, 3000); } else hideTip();
+});
 document.addEventListener("click", function (ev) {
   var tip = ev.target.closest("[data-tip]");
   if (tip) { var rd = tip.closest(".chart").querySelector(".readout"); if (rd) rd.textContent = tip.dataset.tip; return; }
@@ -809,14 +836,14 @@ document.addEventListener("click", function (ev) {
   if (a === "settings") return go("settings");
   if (a === "calnav") { var cm = UI.calMonth || t.slice(0, 7), cd = new Date(Date.UTC(+cm.slice(0, 4), +cm.slice(5, 7) - 1 + (+b.dataset.d), 1)); UI.calMonth = cd.toISOString().slice(0, 7); return render(); }
   if (a === "calday") { UI.calSel = b.dataset.d; UI.calMonth = b.dataset.d.slice(0, 7); return render(); }
-  if (a === "seg") { UI.sub[b.dataset.g] = b.dataset.v; render(); return window.scrollTo(0, 0); }
+  if (a === "seg") { if (b.dataset.g === "finish") readDraft(); UI.sub[b.dataset.g] = b.dataset.v; render(); return window.scrollTo(0, 0); }
   if (a === "welcome") { p._welcomed = true; save(); return render(); }
   if (a === "send") return sendSession(b.dataset.key);
   if (a === "copy") return copySession(b.dataset.key);
   if (a === "finish") {
     var fx = SESSIONS[b.dataset.key] || null;
     UI.draft = { date: fx ? (fx.doneOn || (fx.date <= t ? fx.date : t)) : t, kind: fx ? (fx.origKind || fx.kind) : (S().mode === "reprise" ? "palier" : "footing"), title: fx ? fx.title : "", plannedMin: fx ? Math.round(E.totalMin(fx.blocks)) : null, free: !fx, during: 0, after: 0, morning: null, increasing: false, flags: [false, false, false], gait: false, note: "", activity: null, rpe: null };
-    UI.msg.act = null; UI.finish = true; go("today"); if (ivReady()) fetchAct(); return;
+    UI.msg.act = null; UI.finish = true; UI.sub.finish = fx ? "feel" : "set"; go("today"); if (ivReady()) fetchAct(); return;
   }
   if (a === "finishcancel") { UI.finish = false; UI.draft = null; UI.msg.act = null; return render(); }
   if (a === "weeknav") { UI.weekOff = (UI.weekOff || 0) + (+b.dataset.d); return render(); }
@@ -847,7 +874,7 @@ document.addEventListener("click", function (ev) {
   if (a === "savelog") {
     readDraft(); var d = UI.draft;
     if (!d.date || d.date > t) { alert("Choisis une date passée ou aujourd'hui."); return; }
-    DB.logs.push(Object.assign({}, d, { id: String(Date.now()), title: d.title || KINDS[d.kind], hrTrusted: !!p.hrTrusted })); save(); UI.draft = null; UI.finish = false; UI.msg.act = null;
+    DB.logs.push(Object.assign({}, effDraft(d), { id: String(Date.now()), title: d.title || KINDS[d.kind], hrTrusted: !!p.hrTrusted })); save(); UI.draft = null; UI.finish = false; UI.msg.act = null;
     go("today"); UI.flash = { t: "ok", m: "Séance enregistrée." }; return render();
   }
   if (a === "fetchact") { readDraft(); return fetchAct(); }
@@ -915,7 +942,7 @@ document.addEventListener("input", function (ev) {
 });
 document.addEventListener("change", function (ev) {
   var t = ev.target, p = DB.profile;
-  if (t.id === "mLater") { readDraft(); UI.draft.morning = t.checked ? null : 0; return render(); }
+  if (t.id === "dLater") { readDraft(); UI.draft.later = t.checked; if (t.checked && UI.draft.laterVal == null) UI.draft.laterVal = 3; return render(); }
   if (t.id === "dInc") { UI.draft.increasing = t.checked; return refreshVerdict(); }
   if (t.id === "dGait") { UI.draft.gait = t.checked; return refreshVerdict(); }
   if (t.id === "dKind") { readDraft(); return refreshVerdict(); }
