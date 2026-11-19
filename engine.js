@@ -131,7 +131,7 @@
   function easy(min, label) { return [W5, { k: "course", min: Math.max(10, r5(min - 10)), label: label || "Course facile" }, C5]; }
   function bike(min) { return [{ k: "velo", min: r5(min), label: "Vélo ou elliptique facile" }]; }
   function rando(min, runMin) {
-    var walk = Math.max(20, r5((min - runMin) / 2));
+    var walk = Math.max(15, r5((min - runMin) / 2));
     return [{ k: "marche", min: walk, label: "Rando, montées marchées vite" }, { k: "course", min: r5(runMin), label: "Course facile sur portion plate" }, { k: "marche", min: walk, label: "Rando, descentes marchées" }];
   }
   function hikeRepeats(min, reps) {
@@ -155,7 +155,7 @@
         ? sess(d(3), "cadence", "Footing cadence", [W5, { rep: 2, steps: [{ k: "course", min: Math.max(4, Math.round(lv.block * 0.6 * f)), label: "Course facile" }, { k: "marche", min: 2, label: "Marche" }] }, { rep: 4, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." })
         : sess(d(3), "cadence", "Footing cadence", [W5, { k: "course", min: Math.max(10, cad - 9) , label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." }),
       sess(d(4), "velo", "Vélo ou elliptique", bike(clamp(45 + 5 * (lv.n - 10), 40, 90) * f), { note: "Endurance sans impact pour le tibia." }),
-      sess(d(5), "rando", "Rando-course", rando(clamp(50 + 5 * lv.n, 60, 150) * f, Math.min(25, Math.round(lv.run * 0.3), lv.block || 99)), { note: "Terrain souple. Montées raides et descentes en marchant." }),
+      sess(d(5), "rando", "Rando-course", rando(clamp(lv.run * 1.6, 45, 150) * f, Math.min(25, Math.round(lv.run * 0.3), lv.block || 99)), { note: "Terrain souple. Montées raides et descentes en marchant." }),
     ];
     return out;
   }
