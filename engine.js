@@ -75,7 +75,25 @@
   }
 
   // ---------- Rejouer l'historique ----------
-  function computeState(profile, logs, today) {
+  // ---------- Qualité d'une séance faite (métriques montre + effort ressenti) ----------
+  var EASY = { palier: 1, cadence: 1, footing: 1, rando: 1, longue: 1 };
+  function quality(log) {
+    var r = [];
+    if (EASY[log.kind] && log.rpe != null && log.rpe >= 6) r.push("effort ressenti " + log.rpe + "/10 sur une séance facile");
+    if (EASY[log.kind] && log.hiShare != null && log.hiShare > 0.2) r.push(Math.round(log.hiShare * 100) + " % du temps au-dessus de la zone 2");
+    if (log.plannedMin && log.actualMin && log.actualMin > log.plannedMin * 1.1) r.push("séance plus longue que prévu (" + log.actualMin + " min au lieu de " + log.plannedMin + ")");
+    return r;
+  }
+  // Plus longue course des 30 derniers jours (sorties montre de type course + journal), en minutes de séance
+  function longest30(logs, acts, today) {
+    var m = 0;
+    (acts || []).forEach(function (a) { if (a.run && a.date <= today && diffDays(a.date, today) <= 30) m = Math.max(m, a.min || 0); });
+    (logs || []).forEach(function (l) { if (l.kind !== "rando" && l.date <= today && diffDays(l.date, today) <= 30) m = Math.max(m, l.actualMin || 0); });
+    return m;
+  }
+
+  function computeState(profile, logs, today, ctx) {
+    ctx = ctx || {};
     var s = { mode: "reprise", level: profile.startLevel || 6, streak: 0, stopped: false, lastDate: null, lastVerdict: null, restUntil: null, ultraStart: null, reduce: {}, events: [], returned: false };
     var sorted = (logs || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var prevV = null;
@@ -99,14 +117,19 @@
       if (v === "jaune") return; // pas de montée sur cette séance, série conservée
       // vert : seules les séances « palier » font monter
       // rythme « dynamique » : le footing cadence vert compte aussi → jusqu'à un palier par semaine
+      log._q = quality(log);
+      if (log._q.length) return; // séance trop intense ou trop longue : pas de montée, série conservée
       if (isConsolidation(profile, log.date)) return;
-      if (log.kind === "palier" || log.kind == null || (profile.rythme === "dynamique" && log.kind === "cadence")) {
+      var fast = profile.rythme === "dynamique" || profile.rythme === "limite";
+      if (log.kind === "palier" || log.kind == null || (fast && log.kind === "cadence")) {
         s.streak++;
-        if (s.streak >= 2 && s.level <= MAX_LEVEL) { s.level++; s.streak = 0; s.events.push({ date: log.date, t: "Palier suivant" }); }
+        if (s.streak >= (profile.rythme === "limite" ? 1 : 2) && s.level <= MAX_LEVEL) { s.level++; s.streak = 0; s.events.push({ date: log.date, t: "Palier suivant" }); }
       }
     });
     if (profile.switchDate && s.mode === "reprise" && !s.returned && today >= profile.switchDate) { s.mode = "ultra"; s.ultraStart = profile.switchDate; }
     s.logs = sorted;
+    s.longest = longest30(sorted, ctx.acts, today);
+    s.cap = s.longest ? Math.round(s.longest * 1.1) : null; // plafond de la prochaine course (+10 %)
     s.done = s.level > MAX_LEVEL;
     s.resting = !!(s.restUntil && today <= s.restUntil);
     return s;
@@ -268,6 +291,55 @@
     return g.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
   }
 
+  // ---------- Forme du matin : VFC et pouls au repos (données Garmin via Intervals) ----------
+  // Moyenne VFC sur 7 jours sous (moyenne 60 j − 0,5 écart-type), ou pouls au repos > moyenne 60 j + 5 → forme basse.
+  function readiness(wellness, today) {
+    var w = (wellness || []).filter(function (x) { return x.date <= today && diffDays(x.date, today) <= 60; });
+    var hrv = w.filter(function (x) { return x.hrv > 0; }), out = { status: "inconnu", reasons: [] };
+    function mean(a) { return a.reduce(function (t, v) { return t + v; }, 0) / a.length; }
+    if (hrv.length >= 14) {
+      var ln = hrv.map(function (x) { return Math.log(x.hrv); }), m = mean(ln);
+      var sd = Math.sqrt(mean(ln.map(function (v) { return (v - m) * (v - m); })));
+      var last7 = hrv.filter(function (x) { return diffDays(x.date, today) < 7; }).map(function (x) { return Math.log(x.hrv); });
+      if (last7.length >= 3) { out.status = "ok"; if (mean(last7) < m - 0.5 * sd) { out.status = "bas"; out.reasons.push("variabilité cardiaque (VFC) sous ta normale sur 7 jours"); } }
+    }
+    var rhr = w.filter(function (x) { return x.rhr > 0; }), td = rhr.filter(function (x) { return x.date === today; })[0];
+    if (rhr.length >= 14 && td) {
+      var mr = mean(rhr.map(function (x) { return x.rhr; }));
+      if (out.status === "inconnu") out.status = "ok";
+      if (td.rhr > mr + 5) { out.status = "bas"; out.reasons.push("pouls au repos élevé ce matin (" + td.rhr + " contre " + Math.round(mr) + " d'habitude)"); }
+    }
+    return out;
+  }
+
+  // ---------- Ajustement d'une séance (plafond 30 jours, forme du jour) ----------
+  function scaleRuns(blocks, factor) {
+    return blocks.map(function (b) {
+      if (b.rep) return Object.assign({}, b, { steps: scaleRuns(b.steps, factor) });
+      return b.k === "course" || b.k === "cote" ? Object.assign({}, b, { min: Math.max(1, Math.round(b.min * factor)) }) : b;
+    });
+  }
+  function adjust(x, state, ctx, date) {
+    if (x.kind === "velo" || x.kind === "renfo") return x;
+    var y = x, adj = [];
+    if (ctx && ctx.readiness && ctx.readiness.status === "bas" && ctx.today === date) {
+      if (x.kind === "palier" && x.level > 1) { var lv = LEVELS[x.level - 2]; y = Object.assign({}, x, { title: lv.title + " (allégée)", blocks: lv.blocks, level: lv.n }); }
+      else y = Object.assign({}, x, { title: x.title + " (allégée)", blocks: scaleRuns(x.blocks, 0.75) });
+      adj.push("Forme basse ce matin : " + ctx.readiness.reasons.join(", ") + ". Séance allégée ; vélo facile possible à la place.");
+    }
+    if (state.cap && x.kind !== "rando") {
+      var tot = totalMin(y.blocks);
+      if (tot > state.cap) {
+        var run = tot - (tot - y.blocks.reduce(function (t, b) { return t + (b.rep ? b.rep * b.steps.reduce(function (u, st) { return u + (st.k === "course" || st.k === "cote" ? st.min : 0); }, 0) : (b.k === "course" || b.k === "cote" ? b.min : 0)); }, 0));
+        var f = Math.max(0.3, (run - (tot - state.cap)) / run);
+        y = Object.assign({}, y, { title: y.title + " (plafonnée)", blocks: scaleRuns(y.blocks, f) });
+        adj.push("Plafond de sécurité : ta plus longue sortie des 30 derniers jours fait " + state.longest + " min, donc pas plus de " + state.cap + " min aujourd'hui (+10 % au plus).");
+      }
+    }
+    if (adj.length) y = Object.assign({}, y, { adjustments: adj });
+    return y;
+  }
+
   // ---------- Séances d'une date ----------
   // profile.moves : { "AAAA-MM-JJ|type": "AAAA-MM-JJ" (reportée) ou "skip" (annulée) }
   function sessionKey(x) { return (x.origDate || x.date) + "|" + x.kind; }
@@ -280,7 +352,7 @@
     }
     return out;
   }
-  function sessionsOn(profile, state, date, race) {
+  function sessionsOn(profile, state, date, race, ctx) {
     if (state.stopped) return [];
     if (state.mode === "ultra" && !race) return [];
     var moves = profile.moves || {};
@@ -290,7 +362,7 @@
       return mv ? Object.assign({}, x, { origDate: x.date, date: mv }) : x;
     }).filter(function (x) { return x && x.date === date; });
     if (state.restUntil && date <= state.restUntil) out = out.filter(function (x) { return x.kind === "velo"; });
-    return out;
+    return out.map(function (x) { return adjust(x, state, ctx, date); });
   }
   function weekSessions(profile, state, monday, race) {
     var out = [];
@@ -306,7 +378,8 @@
     var monday = mondayOf(today), out = [];
     var level = Math.min(state.level, MAX_LEVEL + 1), streak = state.streak;
     var switchDate = state.mode === "ultra" ? (state.ultraStart || profile.switchDate) : null, passWeeks = 0;
-    var prog = null, perWeek = profile.rythme === "dynamique" ? 2 : 1, baseDate = state.mode === "ultra" || state.level >= RELIEF_LEVEL ? monday : null;
+    var need = profile.rythme === "limite" ? 1 : 2;
+    var prog = null, perWeek = profile.rythme === "dynamique" || profile.rythme === "limite" ? 2 : 1, baseDate = state.mode === "ultra" || state.level >= RELIEF_LEVEL ? monday : null;
     for (var i = 0; i < nWeeks; i++) {
       var m = addDays(monday, i * 7), w = { monday: m, sessions: [] };
       if (!switchDate) {
@@ -314,7 +387,7 @@
           w.mode = "reprise"; w.level = level; w.consolidation = isConsolidation(profile, m);
           w.sessions = repriseWeek(profile, { level: level }, m);
           if (!baseDate && level >= RELIEF_LEVEL) baseDate = m;
-          if ((i > 0 || weekday(today) <= 1) && !w.consolidation) { streak += perWeek; while (streak >= 2) { level++; streak -= 2; } }
+          if ((i > 0 || weekday(today) <= 1) && !w.consolidation) { streak += perWeek; while (streak >= need) { level++; streak -= need; } }
         } else if (passWeeks < 3) {
           w.mode = "passage"; w.level = MAX_LEVEL; passWeeks++;
           w.sessions = repriseWeek(profile, { level: MAX_LEVEL }, m);
@@ -368,7 +441,7 @@
   function prepStart(profile, state, today) {
     if (state.mode === "ultra") return state.ultraStart || today;
     var pr = projection(profile, state, today, null, 80);
-    return (profile.rythme === "dynamique" ? pr.baseDate : pr.switchDate) || addDays(today, 560);
+    return (profile.rythme === "dynamique" || profile.rythme === "limite" ? pr.baseDate : pr.switchDate) || addDays(today, 560);
   }
 
   // ---------- Estimation de la charge cible (fin de reprise) ----------
@@ -378,7 +451,7 @@
     return projection(profile, state, today, null, 80).switchDate || addDays(today, 560);
   }
 
-  var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, LADDER_V1: LADDER_V1, isConsolidation: isConsolidation, PHASES: PHASES, verdict: verdict, verdictInContext: verdictInContext, computeState: computeState, passage: passage,
+  var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, LADDER_V1: LADDER_V1, isConsolidation: isConsolidation, PHASES: PHASES, verdict: verdict, verdictInContext: verdictInContext, quality: quality, readiness: readiness, adjust: adjust, computeState: computeState, passage: passage,
     repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, sessionKey: sessionKey, weekSessions: weekSessions,
     totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal, prepStart: prepStart,
     addDays: addDays, diffDays: diffDays, todayStr: todayStr, longDate: longDate, monthYear: monthYear, mondayOf: mondayOf, weekday: weekday };

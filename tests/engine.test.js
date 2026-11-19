@@ -108,4 +108,24 @@ assert.equal(E.sessionsOn(mp, s, '2026-11-24', null).length, 0);
 assert.equal(E.sessionsOn(mp, s, '2026-11-25', null)[0].kind, 'palier');
 assert.equal(E.sessionsOn(mp, s, '2026-11-25', null)[0].origDate, '2026-11-24');
 assert.equal(E.sessionsOn(mp, s, '2026-11-26', null).length, 0);
+// Rythme limite : chaque course verte qui compte fait monter
+const lim = { ...prof, rythme: 'limite' };
+s = E.computeState(lim, [g('2026-11-24'), g('2026-11-26', 'cadence')], '2026-11-27');
+assert.equal(s.level, 12);
+const pl = E.projection(lim, E.computeState(lim, [], '2026-11-19'), '2026-11-19', null, 60);
+console.log('limite : base', pl.baseDate, 'programme', pl.switchDate);
+// Qualité : séance facile trop intense → pas de montée
+s = E.computeState(lim, [{ ...g('2026-11-24'), rpe: 7 }], '2026-11-25');
+assert.equal(s.level, 10); assert.ok(s.logs[0]._q.length);
+// Plafond 30 jours : plus longue sortie 40 min → pas plus de 44 min
+s = E.computeState({ ...prof, startLevel: 12 }, [], '2026-11-23', { acts: [{ date: '2026-11-18', run: true, min: 40 }] });
+assert.equal(s.cap, 44);
+const capped = E.sessionsOn({ ...prof, startLevel: 12 }, s, '2026-11-24', null, {});
+assert.ok(E.totalMin(capped[0].blocks) <= 44.5 && capped[0].adjustments, 'plafond ' + E.totalMin(capped[0].blocks));
+// Forme du matin : VFC basse sur 7 jours → séance allégée
+const well = []; for (let i = 60; i >= 0; i--) well.push({ date: E.addDays('2026-11-24', -i), hrv: i < 7 ? 40 : 60 + (i % 5), rhr: 50 });
+const rdy = E.readiness(well, '2026-11-24'); assert.equal(rdy.status, 'bas');
+s = E.computeState(prof, [], '2026-11-23');
+const light = E.sessionsOn(prof, s, '2026-11-24', null, { today: '2026-11-24', readiness: rdy });
+assert.equal(light[0].level, 9); assert.ok(/allégée/.test(light[0].title));
 console.log('OK');

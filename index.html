@@ -155,7 +155,8 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); saveOk = 
 var UI = { tab: (location.hash || "#today").slice(1), draft: null, msg: {}, raceDraft: null };
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 function today() { return E.todayStr(); }
-function S() { return E.computeState(DB.profile, DB.logs, today()); }
+function S() { return E.computeState(DB.profile, DB.logs, today(), { acts: ACTS.list }); }
+function CTX() { return { today: today(), readiness: E.readiness(WELL.list, today()) }; }
 function cap(x) { return x.charAt(0).toUpperCase() + x.slice(1); }
 function num(x) { return String(x).replace(".", ","); }
 function chip(v, prov) {
@@ -196,15 +197,26 @@ function ivError(e) {
 }
 var SESSIONS = {};
 // Sorties réellement faites (Garmin → Intervals.icu), mises en cache 30 min
-var ACTS = { at: 0, list: null, loading: false };
-function isRun(t) { return /Run|Hike|Walk/i.test(t || ""); }
+var ACTS = { at: 0, list: null, loading: false }, WELL = { list: null };
+function isRun(t) { return /Run/i.test(t || ""); }
+function actInfo(a) {
+  var z = a.icu_hr_zone_times, hi = null;
+  if (z && z.length > 2) { var tot = z.reduce(function (u, v) { return u + (v || 0); }, 0); if (tot) hi = z.slice(2).reduce(function (u, v) { return u + (v || 0); }, 0) / tot; }
+  var sec = a.moving_time || a.elapsed_time || 0, cad = a.average_cadence ? Math.round(a.average_cadence < 120 ? a.average_cadence * 2 : a.average_cadence) : null;
+  return { date: String(a.start_date_local || "").slice(0, 10), run: isRun(a.type), type: a.type, min: Math.round(sec / 60), name: a.name || "",
+    km: ((a.distance || 0) / 1000).toFixed(2).replace(".", ","), time: Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"),
+    hr: a.average_heartrate ? Math.round(a.average_heartrate) : null, cad: cad, hiShare: hi, decoupling: a.decoupling != null ? Math.round(a.decoupling * 10) / 10 : null };
+}
 function loadActs(force) {
   if (!ivReady() || ACTS.loading || (!force && ACTS.list && Date.now() - ACTS.at < 30 * 60000)) return;
   var t = today(); ACTS.loading = true;
   ivFetch("/activities?oldest=" + E.addDays(E.mondayOf(t), -7) + "&newest=" + t).then(function (list) {
-    ACTS.list = (list || []).map(function (a) { return { date: String(a.start_date_local || "").slice(0, 10), run: isRun(a.type), type: a.type, min: Math.round((a.moving_time || 0) / 60), name: a.name || "" }; });
+    ACTS.list = (list || []).map(actInfo);
     ACTS.at = Date.now(); ACTS.loading = false; render();
   }).catch(function () { ACTS.loading = false; });
+  ivFetch("/wellness?oldest=" + E.addDays(t, -60) + "&newest=" + t).then(function (w) {
+    WELL.list = (w || []).map(function (x) { return { date: String(x.id || x.date || "").slice(0, 10), hrv: x.hrv || null, rhr: x.restingHR || null }; }); render();
+  }).catch(function () {});
 }
 // Une course faite ce jour-là (Intervals ou journal) ?
 function ranOn(d) {
@@ -246,6 +258,7 @@ function sessionCard(sess, key, label) {
   return '<section class="card"><div class="row"><h2>' + esc(label) + '</h2><span class="chip soft">' + esc(KINDS[sess.kind] || sess.kind) + "</span></div>" +
     '<div class="hero"><b>' + Math.round(min) + '</b><span>min au total</span></div>' +
     '<p style="font-family:var(--head);font-weight:700;font-size:20px">' + esc(sess.title) + '</p><p class="muted">' + esc(sub) + "</p>" +
+    (sess.adjustments ? sess.adjustments.map(function (a) { return '<div class="notice err">' + esc(a) + "</div>"; }).join("") : "") +
     stepsHtml(sess.blocks) + (sess.note ? '<div class="notice">' + esc(sess.note) + "</div>" : "") +
     (sess.kind !== "velo" ? '<p class="muted">Pendant la course : au-delà de 3/10, ralentis ou marche. Au-delà de 5/10, ou si la douleur augmente, arrête et rentre en marchant.</p>' : "") +
     '<button class="primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix 7X</button>" + msgHtml(key) +
@@ -280,11 +293,13 @@ function vToday() {
   if (!saveOk) h += '<div class="notice err">Le stockage du téléphone est indisponible : tes saisies ne seront pas gardées.</div>';
   if (!DB.logs.length && !p._welcomed) h += '<section class="card"><h2>Bienvenue sur NaqRun</h2><p class="muted">Tu démarres au palier ' + p.startLevel + " (" + esc(E.LEVELS[p.startLevel - 1].title) + '). Relie Intervals.icu dans les réglages pour envoyer les séances sur ta Fenix.</p><div class="btns"><button class="small" data-act="settings">Réglages</button><button class="small" data-act="welcome">Compris</button></div></section>';
   if (s.stopped) h += '<section class="card" style="border-color:var(--r)"><div class="row"><h2>Arrêt</h2>' + chip("stop") + '</div><p>Tu as signalé un signe d\'arrêt (douleur précise sur l\'os, douleur au repos ou boiterie). Arrête la course et demande un avis médical : ce sont des signes possibles de fracture de fatigue.</p><button data-act="clearstop">J\'ai eu le feu vert médical</button></section>';
+  var rd = E.readiness(WELL.list, t);
+  if (rd.status !== "inconnu") h += '<section class="card"><div class="row"><h2>Forme du matin</h2><span class="chip ' + (rd.status === "ok" ? "vert" : "orange") + '"><span class="dot"></span>' + (rd.status === "ok" ? "Normale" : "Basse") + '</span></div><p class="muted">' + (rd.status === "ok" ? "VFC et pouls au repos dans ta normale (montre Garmin) : séance prévue maintenue." : esc(cap(rd.reasons.join(" ; "))) + " : la course du jour est allégée.") + "</p></section>";
   var pending = s.logs.filter(function (l) { return l.morning == null && l.date < t; }).pop();
   if (pending) h += '<section class="card"><div class="row"><h2>Note du matin</h2><span class="muted">' + esc(E.longDate(pending.date)) + '</span></div><label class="field"><span class="row">Douleur au tibia au réveil <span class="val" id="mv">0/10</span></span><input type="range" min="0" max="10" value="0" id="morningQuick"></label><button class="primary" data-act="morning" data-id="' + pending.id + '">Valider la note</button></section>';
   var race = p.race;
   if (!s.stopped) {
-    var list = E.sessionsOn(p, s, t, race);
+    var list = E.sessionsOn(p, s, t, race, CTX());
     if (s.mode === "ultra" && !race) h += '<section class="card"><h2>Définis ta course</h2><p class="muted">Ta reprise est validée. Renseigne ta course objectif pour générer le programme.</p><button class="primary" data-act="tab" data-tab="course">Fiche course</button></section>';
     else if (list.length) list.forEach(function (x, i) {
       if (x.kind !== "velo" && ranOn(E.addDays(t, -1)) && !ranOn(t)) h += '<div class="notice">Tu as déjà couru hier. Pour le tibia, mieux vaut un jour sans course entre deux sorties : décale « ' + esc(x.title) + ' » à demain (bouton sous la séance) ou fais du vélo aujourd\'hui.</div>';
@@ -314,7 +329,7 @@ function vJournal() {
   var s = S(), t = today(), h = "";
   if (!UI.draft) {
     var runs = E.sessionsOn(DB.profile, s, t, DB.profile.race).filter(function (x) { return x.kind !== "velo"; });
-    UI.draft = { date: t, kind: runs[0] ? runs[0].kind : (s.mode === "reprise" ? "palier" : "footing"), title: runs[0] ? runs[0].title : "", during: 0, after: 0, morning: null, increasing: false, flags: [false, false, false], note: "", activity: null };
+    UI.draft = { date: t, kind: runs[0] ? runs[0].kind : (s.mode === "reprise" ? "palier" : "footing"), title: runs[0] ? runs[0].title : "", plannedMin: runs[0] ? Math.round(E.totalMin(runs[0].blocks)) : null, during: 0, after: 0, morning: null, increasing: false, flags: [false, false, false], note: "", activity: null, rpe: null };
   }
   var d = UI.draft;
   h += '<header class="hdr"><div><p class="muted">Après chaque course, puis le lendemain matin</p><h1>Journal</h1></div></header>';
@@ -324,8 +339,11 @@ function vJournal() {
     '<label class="field">Intitulé<input type="text" id="dTitle" value="' + esc(d.title) + '" placeholder="Ex. 40 min continu"></label>' +
     '<button class="small" data-act="fetchact"' + (ivReady() ? "" : " disabled") + ">Récupérer la sortie depuis Intervals.icu</button>" +
     (UI.msg.act ? '<div class="notice ' + UI.msg.act.t + '">' + esc(UI.msg.act.m) + "</div>" : "") +
-    (d.activity ? '<div class="grid4">' + stat(d.activity.km, "km") + stat(d.activity.time, "durée") + stat(d.activity.hr || "—", "FC moy.") + stat(d.activity.cad || "—", "cadence") + "</div>" + (d.activity.cad && d.activity.cad < 165 ? '<div class="notice">Cadence sous 165 pas/min : vise des pas plus courts et plus rapides.</div>' : "") : "") +
+    (d.activity ? '<div class="grid4">' + stat(d.activity.km, "km") + stat(d.activity.time, "durée") + stat(d.activity.hr || "—", "FC moy.") + stat(d.activity.cad || "—", "cadence") + "</div>" + (d.activity.cad && d.activity.cad < 165 ? '<div class="notice">Cadence sous 165 pas/min : vise des pas plus courts et plus rapides.</div>' : "") +
+      (d.activity.hiShare != null ? '<p class="muted">Temps au-dessus de la zone 2 : ' + Math.round(d.activity.hiShare * 100) + " %" + (d.activity.decoupling != null ? " · dérive cardiaque : " + num(d.activity.decoupling) + " %" : "") + "</p>" : "") +
+      (d.activity.decoupling != null && d.activity.decoupling > 5 ? '<div class="notice">Dérive cardiaque au-dessus de 5 % : ton cœur a dû monter en fin de séance. Reste en bas de zone 2 la prochaine fois.</div>' : "") : "") +
     "</section>";
+  h += '<section class="card"><h2>Effort ressenti</h2><label class="field"><span class="row">De 0 (repos) à 10 (maximal) <span class="val" id="o-rpe">' + (d.rpe == null ? "—" : d.rpe + "/10") + '</span></span><input type="range" min="0" max="10" value="' + (d.rpe == null ? 3 : d.rpe) + '" data-pain="rpe"></label><p class="muted">Une séance facile devrait rester entre 2 et 4. À 6 ou plus, elle ne fait pas monter de palier.</p></section>';
   h += '<section class="card"><h2>Douleur au tibia</h2>' + slider("Pendant la séance", "during", d.during) + slider("Juste après", "after", d.after) +
     '<label class="check"><input type="checkbox" id="mLater"' + (d.morning == null ? " checked" : "") + ">Je donnerai la note du lendemain matin plus tard</label>" +
     (d.morning == null ? "" : slider("Le lendemain matin", "morning", d.morning)) +
@@ -346,9 +364,11 @@ function slider(label, key, val) { return '<label class="field"><span class="row
 function verdictHtml(d) {
   var prev = S().logs.filter(function (l) { return l.date <= d.date; }).pop();
   var v = E.verdictInContext(d, prev ? prev._v : null), prov = d.morning == null;
-  var counts = d.kind === "palier" || (DB.profile.rythme === "dynamique" && d.kind === "cadence");
+  var counts = d.kind === "palier" || ((DB.profile.rythme === "dynamique" || DB.profile.rythme === "limite") && d.kind === "cadence");
   var m = { vert: counts ? "Séance validée. Deux séances vertes qui comptent, de suite : palier suivant." : "Séance validée (elle ne fait pas monter de palier).", jaune: "Douleur pendant la course seulement : pas de montée sur cette séance, mais ta série de séances vertes est conservée et la semaine n\'est pas allégée. Deux fois de suite, ça compte comme un orange.", orange: (prev && prev._v === "jaune" && E.verdict(d) === "jaune" ? "Deuxième « orange pendant » de suite : " : "") + "Tu refais le même palier, série remise à zéro (en programme : semaine suivante allégée).", rouge: "Recul de 2 paliers et 48 h sans course.", stop: "Arrête la course et demande un avis médical." }[v];
-  return '<div class="row"><h2>Prévision</h2>' + chip(v, prov) + '</div><p class="muted">' + esc(m + (prov && v !== "stop" ? " Confirmée après la note du lendemain matin." : "")) + "</p>";
+  var q = v === "vert" ? E.quality(d) : [];
+  return '<div class="row"><h2>Prévision</h2>' + chip(v, prov) + '</div><p class="muted">' + esc(m + (prov && v !== "stop" ? " Confirmée après la note du lendemain matin." : "")) + "</p>" +
+    (q.length ? '<div class="notice">Pas de montée de palier malgré le feu vert : ' + esc(q.join(", ")) + ". Ta série est conservée.</div>" : "");
 }
 
 function vPlan() {
@@ -414,7 +434,7 @@ function raceAnalysis(r, s, start) {
     h += '<section class="card"><h2>Analyse</h2><div class="grid4">' + stat(an.kmE, "km-effort") + stat(an.ratio, "m D+/km") + stat(cap(an.profil), "profil") + stat(an.stages, an.stages > 1 ? "étapes" : "étape") + "</div>" +
       '<p>Durée estimée : <strong>' + hh(an.totalHours) + "</strong>" + (an.stages > 1 ? " (≈ " + hh(an.stageHours) + " par étape)" : "") + '</p><p class="muted">Estimation à partir de ta course de référence (réglages), seulement pour dimensionner les sorties longues. Pas un objectif.</p>' +
       (an.margin != null ? '<div class="notice ' + (an.margin >= 2 ? "ok" : an.margin >= 0 ? "" : "err") + '">Marge estimée sur le temps limite : ' + (an.margin >= 0 ? hh(an.margin) : "dépassement de " + hh(-an.margin)) + ".</div>" : "") +
-      '<p>Préparation recommandée (' + esc(an.prep.label) + ") : <strong>" + an.prep.min + " à " + an.prep.max_ + ' semaines</strong></p><p class="muted">Semaines disponibles depuis ' + (s.mode === "ultra" ? "le début du programme" : p.rythme === "dynamique" ? "l\'arrivée au relief en reprise (" + E.monthYear(start) + "), quand ton volume forme déjà une base" : "la fin de reprise estimée (" + E.monthYear(start) + ")") + " : " + an.weeks + "</p>" +
+      '<p>Préparation recommandée (' + esc(an.prep.label) + ") : <strong>" + an.prep.min + " à " + an.prep.max_ + ' semaines</strong></p><p class="muted">Semaines disponibles depuis ' + (s.mode === "ultra" ? "le début du programme" : (p.rythme === "dynamique" || p.rythme === "limite") ? "l\'arrivée au relief en reprise (" + E.monthYear(start) + "), quand ton volume forme déjà une base" : "la fin de reprise estimée (" + E.monthYear(start) + ")") + " : " + an.weeks + "</p>" +
       '<div class="notice ' + (an.feas === "ok" ? "ok" : an.feas === "tendu" ? "" : "err") + '">' + esc(feasTxt) + "</div></section>";
   }
   return h;
@@ -428,8 +448,11 @@ function vProj() {
   var maxMin = Math.max.apply(null, weeks.map(function (w) { return w.minutes; }).concat([60]));
   h += '<header class="hdr"><div><p class="muted">Si toutes les séances restent vertes</p><h1>Projection</h1></div></header>';
   var dyn = p.rythme === "dynamique";
-  h += '<section class="card"><h2>Rythme de progression</h2><div class="btns"><button class="small' + (dyn ? "" : " primary") + '" data-act="rythme" data-v="prudent" aria-pressed="' + !dyn + '">Prudent</button><button class="small' + (dyn ? " primary" : "") + '" data-act="rythme" data-v="dynamique" aria-pressed="' + dyn + '">Dynamique</button></div>' +
-    '<p class="muted">' + (dyn ? "Dynamique : le footing palier et le footing cadence verts comptent tous les deux, soit jusqu\'à un palier par semaine (+10 % au plus), hors semaine de consolidation. La préparation de course compte dès que la reprise atteint le relief. Les règles douleur ne changent pas : un orange bloque la montée, un rouge fait reculer." : "Prudent : seule la séance palier compte, soit un palier toutes les deux semaines (+10 % au plus). La préparation de course compte après le test de passage.") + "</p></section>";
+  var ry = p.rythme || "prudent";
+  var rb = function (v, l) { return '<button class="small' + (ry === v ? " primary" : "") + '" data-act="rythme" data-v="' + v + '" aria-pressed="' + (ry === v) + '">' + l + "</button>"; };
+  h += '<section class="card"><h2>Rythme de progression</h2><div class="btns">' + rb("prudent", "Prudent") + rb("dynamique", "Dynamique") + rb("limite", "Limite") + "</div>" +
+    (ry === "limite" ? '<p class="muted">Limite : chaque course verte qui compte (palier ou footing cadence) fait monter d\'un palier, jusqu\'à 2 paliers par semaine. Borne dure : jamais plus de 10 % au-dessus de ta plus longue sortie réelle des 30 derniers jours. Les règles douleur, la semaine de consolidation et les ajustements selon tes données restent actifs. C\'est le rythme le plus rapide que la science permet, et celui où il faut le plus écouter le journal de douleur.</p></section>' : "") +
+    (ry === "limite" ? "" : '<p class="muted">' + (dyn ? "Dynamique : le footing palier et le footing cadence verts comptent tous les deux, soit jusqu\'à un palier par semaine (+10 % au plus), hors semaine de consolidation. La préparation de course compte dès que la reprise atteint le relief. Les règles douleur ne changent pas : un orange bloque la montée, un rouge fait reculer." : "Prudent : seule la séance palier compte, soit un palier toutes les deux semaines (+10 % au plus). La préparation de course compte après le test de passage.") + "</p></section>");
   h += '<section class="card"><div class="row"><h2>Grandes étapes</h2></div>' +
     '<p>Fin des paliers de reprise : <strong>' + esc((function () { var w = pr.weeks.filter(function (x) { return x.mode === "passage"; })[0]; return w ? cap(E.longDate(w.monday)) : (s.mode === "ultra" ? "faite" : "au-delà de 9 mois"); })()) + "</strong></p>" +
     '<p>Début du programme ultra : <strong>' + esc(pr.switchDate ? cap(E.longDate(pr.switchDate)) : "à définir") + "</strong></p>" +
@@ -520,8 +543,8 @@ document.addEventListener("click", function (ev) {
     ivFetch("/activities?oldest=" + dd + "&newest=" + dd).then(function (list) {
       var runs = (list || []).filter(function (x) { return /Run|Hike|Walk/.test(x.type || ""); });
       if (!runs.length) { UI.msg.act = { t: "err", m: "Aucune sortie trouvée ce jour-là dans Intervals.icu (la synchro Garmin peut prendre quelques minutes)." }; return render(); }
-      var r = runs[0], sec = r.moving_time || r.elapsed_time || 0, cad = r.average_cadence ? Math.round(r.average_cadence < 120 ? r.average_cadence * 2 : r.average_cadence) : null;
-      UI.draft.activity = { km: ((r.distance || 0) / 1000).toFixed(2).replace(".", ","), time: Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"), hr: r.average_heartrate ? Math.round(r.average_heartrate) : null, cad: cad, name: r.name || "" };
+      var r = runs[0], ai = actInfo(r);
+      UI.draft.activity = ai; UI.draft.actualMin = ai.min; UI.draft.hiShare = ai.hiShare; UI.draft.cad = ai.cad; UI.draft.decoupling = ai.decoupling;
       UI.msg.act = { t: "ok", m: "Sortie récupérée : " + (r.name || "course") + "." }; render();
     }).catch(function (e) { UI.msg.act = { t: "err", m: ivError(e) }; render(); });
     return;
