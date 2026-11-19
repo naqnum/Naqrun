@@ -565,7 +565,12 @@ function refreshVerdict() { readDraft(); var b = document.getElementById("verdic
 
 window.addEventListener("hashchange", function () { var h = location.hash.slice(1); if (h && h !== UI.tab) { UI.tab = h; render(); } });
 render();
-if ("serviceWorker" in navigator && location.protocol === "https:") { navigator.serviceWorker.register("sw.js").catch(function () {}); }
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(function (reg) { reg.update(); }).catch(function () {});
+  // nouvelle version installée : recharger une fois pour l'afficher
+  var reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", function () { if (!reloaded) { reloaded = true; location.reload(); } });
+}
 </script>
 </body>
 </html>
