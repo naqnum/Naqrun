@@ -128,4 +128,11 @@ const rdy = E.readiness(well, '2026-11-24'); assert.equal(rdy.status, 'bas');
 s = E.computeState(prof, [], '2026-11-23');
 const light = E.sessionsOn(prof, s, '2026-11-24', null, { today: '2026-11-24', readiness: rdy });
 assert.equal(light[0].level, 9); assert.ok(/allégée/.test(light[0].title));
+// Protocole Nolio : 2 min de marche, blocs, 1 min de marche ; foulée modifiée = rouge
+const l5 = E.LEVELS[4]; assert.equal(l5.blocks[0].min, 2); assert.equal(l5.blocks[1].steps[1].min, 1);
+assert.equal(E.verdict({ ...g('2026-11-24'), gait: true }), 'rouge');
+const pb = E.buildProgram({ ...prof, switchDate: '2027-02-15' }, E.computeState({ ...prof, switchDate: '2027-02-15' }, [], '2027-02-16'), barjo);
+assert.ok(pb.weeks.some(w => w.block === 'Développement') && pb.weeks[0].block === 'Endurance fondamentale');
+assert.ok(pb.weeks.some(w => w.sessions.some(x => /avec rappel/.test(x.title))));
+assert.ok(!/\d/.test(E.intervalsText(pb.weeks[0].sessions[0].blocks).replace(/\d+m|\d+s|Z\d|\d+x/g, '')));
 console.log('OK');

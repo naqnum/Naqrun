@@ -27,13 +27,15 @@
   var RELIEF = "Pentes douces seulement (moins de 6 %). Montées raides et descentes : en marchant.";
   // Chaque marche ≤ 10 % de la plus longue course récente (étude Garmin-RUNSAFE, BJSM 2025)
   function lvC(n, phase, run, label, note) { return { n: n, phase: phase, title: (phase >= 4 ? "Trail " + run + " min" : run + " min " + (phase === 3 ? "vallonné doux" : "continu")), run: run, blocks: cont(run, label), note: note }; }
+  // Structure reprise de ton protocole Nolio : 2 min de marche, puis blocs de course séparés par 1 min de marche
+  var W2 = { k: "marche", min: 2, label: "Échauffement en marchant" }, C3 = { k: "marche", min: 3, label: "Retour au calme" };
   function frac(n, reps, block, walk) {
     return { n: n, phase: 0, title: reps + " × " + block + " min", run: reps * block, block: block, note: walk + " min de marche entre les blocs.",
-      blocks: [W5, { rep: reps, steps: [{ k: "course", min: block, label: "Course facile" }, { k: "marche", min: walk, label: "Marche" }] }, C5] };
+      blocks: [W2, { rep: reps, steps: [{ k: "course", min: block, label: "Course facile" }, { k: "marche", min: walk, label: "Marche" }] }, C3] };
   }
   var LEVELS = [
-    frac(1, 4, 5, 2), frac(2, 2, 11, 2), frac(3, 2, 12, 2), frac(4, 2, 13, 2), frac(5, 2, 14, 2),
-    frac(6, 2, 15, 2), frac(7, 2, 16, 2), frac(8, 2, 17, 2), frac(9, 2, 18, 2),
+    frac(1, 4, 5, 1), frac(2, 2, 11, 1), frac(3, 2, 12, 1), frac(4, 2, 13, 1), frac(5, 2, 14, 1),
+    frac(6, 2, 15, 1), frac(7, 2, 16, 1), frac(8, 2, 17, 1), frac(9, 2, 18, 1),
     lvC(10, 1, 40), lvC(11, 1, 44), lvC(12, 1, 48),
     lvC(13, 2, 53), lvC(14, 2, 58),
     lvC(15, 3, 64, "Course facile, vallonné doux", RELIEF), lvC(16, 3, 70, "Course facile, vallonné doux", RELIEF),
@@ -55,7 +57,7 @@
   function verdict(log) {
     if (log.flags && log.flags.some(Boolean)) return "stop";
     var m = log.morning;
-    if (log.during >= 6 || log.after >= 6 || log.increasing || (m != null && m >= 4)) return "rouge";
+    if (log.during >= 6 || log.after >= 6 || log.increasing || log.gait || (m != null && m >= 4)) return "rouge";
     if (log.after >= 4 || (m != null && m >= 2)) return "orange";
     if (log.during >= 4) return "jaune";
     return "vert";
@@ -76,7 +78,7 @@
 
   // ---------- Rejouer l'historique ----------
   // ---------- Qualité d'une séance faite (métriques montre + effort ressenti) ----------
-  var EASY = { palier: 1, cadence: 1, footing: 1, rando: 1, longue: 1 };
+  var EASY = { palier: 1, cadence: 1, footing: 1, vallon: 1, rando: 1, longue: 1 };
   function quality(log) {
     var r = [];
     if (EASY[log.kind] && log.rpe != null && log.rpe >= 6) r.push("effort ressenti " + log.rpe + "/10 sur une séance facile");
@@ -161,6 +163,10 @@
     var main = reps * 7;
     return [{ k: "course", min: 15, label: "Échauffement en course facile" }, { rep: reps, steps: [{ k: "cote", min: 4, label: "Montée de la côte en marche rapide" }, { k: "marche", min: 3, label: "Descente marchée" }] }, { k: "course", min: Math.max(10, r5(min - 15 - main)), label: "Retour au calme" }];
   }
+  // « Footing de développement + lignes droites » (Nolio) : endurance puis 5 × (15 s vif / 45 s facile)
+  function lignes(min) { return [W5, { k: "course", min: Math.max(10, r5(min - 15)), label: "Course facile" }, { rep: 5, steps: [{ k: "course", min: 0.25, label: "Ligne droite, relâché" }, { k: "course", min: 0.75, label: "Course facile" }] }, C5]; }
+  // « Sortie longue avec rappel » (Nolio) : longue facile puis 10 min un cran au-dessus
+  function rappel(min) { return [W5, { k: "course", min: Math.max(20, r5(min - 20)), label: "Course facile" }, { k: "cote", min: 10, label: "Rappel, un cran au-dessus" }, C5]; }
   function strides(min) { return [W5, { k: "course", min: Math.max(10, r5(min - 18)), label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, relâché" }, { k: "course", min: 1, label: "Course facile" }] }, C5]; }
   function totalMin(blocks) {
     return blocks.reduce(function (t, b) { return t + (b.rep ? b.rep * b.steps.reduce(function (u, st) { return u + st.min; }, 0) : b.min); }, 0);
@@ -175,7 +181,7 @@
     var out = [
       sess(d(1), "palier", "Footing progression · " + lv.title, lv.blocks, { level: lv.n, phase: PHASES[lv.phase], note: consNote + [lv.note, CADENCE].filter(Boolean).join(" "), key: true, consolidation: cons }),
       lv.phase === 0
-        ? sess(d(3), "cadence", "Footing cadence · 2 × " + Math.max(4, Math.round(lv.block * 0.6 * f)) + " min", [W5, { rep: 2, steps: [{ k: "course", min: Math.max(4, Math.round(lv.block * 0.6 * f)), label: "Course facile" }, { k: "marche", min: 2, label: "Marche" }] }, { rep: 4, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." })
+        ? sess(d(3), "cadence", "Footing cadence · 2 × " + Math.max(4, Math.round(lv.block * 0.6 * f)) + " min", [W5, { rep: 2, steps: [{ k: "course", min: Math.max(4, Math.round(lv.block * 0.6 * f)), label: "Course facile" }, { k: "marche", min: 1, label: "Marche" }] }, { rep: 4, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." })
         : sess(d(3), "cadence", "Footing cadence · " + Math.max(10, cad - 9) + " min", [W5, { k: "course", min: Math.max(10, cad - 9) , label: "Course facile" }, { rep: 6, steps: [{ k: "course", min: 0.5, label: "Cadence haute, même allure" }, { k: "course", min: 1, label: "Course facile" }] }, C5], { note: consNote + "Pas plus vite : seulement des pas plus courts et plus rapides." }),
       sess(d(4), "velo", "Vélo / elliptique · facile", bike(clamp(45 + 5 * (lv.n - 10), 40, 90) * f), { note: "Endurance sans impact pour le tibia." }),
       sess(d(5), "rando", "Rando-course · terrain souple", rando(clamp(lv.run * 1.6, 45, 150) * f, Math.min(25, Math.round(lv.run * 0.3), lv.block || 99)), { note: "Terrain souple. Montées raides et descentes en marchant." }),
@@ -229,7 +235,7 @@
     [taperStart - 2, taperStart - 5, taperStart - 9].forEach(function (i) { if (i >= 1 && i < taperStart) chocs[i] = true; });
     var prepRace = an.kmE >= 75 && taperStart - 7 >= 2 ? taperStart - 7 : null;
     for (var i = 0; i < weeks; i++) {
-      var block = i >= taperStart ? "Affûtage" : i >= taperStart - spec ? "Spécifique" : i >= taperStart - spec - constr ? "Construction" : "Base";
+      var block = i >= taperStart ? "Affûtage" : i >= taperStart - spec ? "Spécifique" : i >= taperStart - spec - constr ? "Développement" : "Endurance fondamentale";
       var hours, light = false;
       if (block === "Affûtage") { var k = i - taperStart; hours = peak * (taper === 3 ? [0.8, 0.6, 0.4] : [0.55, 0.4])[k]; }
       else {
@@ -243,6 +249,11 @@
       var w = { i: i + 1, monday: monday, block: block, hours: Math.round(hours * 2) / 2, light: light, choc: !!chocs[i], prepRace: prepRace === i,
         dplus: block === "Affûtage" ? Math.round(dplusPeak * frac * 0.6 / 50) * 50 : Math.round(dplusPeak * frac / 50) * 50 };
       w.sessions = ultraWeek(w, race, an, longPeak, weeks - i, hours);
+      w.infos = [];
+      if (w.light) w.infos.push("Décharge / assimilation : la fatigue s'efface, la forme s'installe.");
+      if (w.choc) w.infos.push(an.stages > 1 ? "Bloc 3 jours : simulation des étapes, sac et ravitaillement." : "Week-end choc : surcharge contrôlée, sommeil et nutrition soignés.");
+      if (block === "Spécifique") w.infos.push("Spécifique : teste nutrition, matériel, départ de nuit à la frontale ; tannage des pieds.");
+      if (block === "Affûtage") w.infos.push("Affûtage : volume en baisse, sommeil prioritaire.");
       out.push(w);
     }
     return { weeks: out, analysis: an, peak: peak, longPeak: longPeak, dplusPeak: dplusPeak, taper: taper, gates: gates(out, an, longPeak) };
@@ -260,8 +271,8 @@
       }
       return s.filter(function (x) { return x.date < race.date; });
     }
-    s.push(sess(d(1), "footing", w.block === "Base" ? "Footing facile · 6 accélérations" : "Footing facile", w.block === "Base" ? strides(M * 0.14) : easy(M * 0.12), { note: CADENCE }));
-    if (w.block === "Base") s.push(sess(d(3), "rando", "Rando-course · avec D+", rando(M * 0.2, 20)));
+    s.push(sess(d(1), "footing", w.block === "Endurance fondamentale" ? "Footing facile · lignes droites" : "Footing facile", w.block === "Endurance fondamentale" ? lignes(M * 0.14) : easy(M * 0.12), { note: CADENCE }));
+    if (w.block === "Endurance fondamentale") s.push(sess(d(3), "vallon", "Vallon · facile", easy(M * 0.2, "Course facile, terrain vallonné"), { note: "Montées raides marchées." }));
     else s.push(sess(d(3), "cote", "Côtes marchées · " + Math.min(10, 4 + Math.floor(hours / 2)) + " montées", hikeRepeats(M * 0.16, Math.min(10, 4 + Math.floor(hours / 2))), { note: "Marche rapide en montée, bâtons si tu cours avec. Faible impact pour le tibia." }));
     s.push(sess(d(4), "velo", "Vélo / elliptique · facile", bike(clamp(M * 0.12, 40, 120))));
     if (w.choc && an.stages > 1) {
@@ -275,7 +286,7 @@
       s.push(sess(d(5), "longue", "Week-end choc · jour 1", easy(longPeak * 60, "Course et marche, sac complet"), { note: "Teste nutrition et matériel." }));
       s.push(sess(d(6), "longue", "Week-end choc · jour 2", easy(longPeak * 60 * 0.6, "Course et marche sur jambes fatiguées")));
     } else {
-      s.push(sess(d(5), "longue", w.block === "Base" ? "Sortie longue · facile" : "Sortie longue · avec sac", easy(longMin, "Course facile, montées raides marchées"), { note: w.prepRace ? "Semaine idéale pour une course de préparation : ≈ " + Math.round(race.km / 2) + " km et " + Math.round(race.dplus / 2) + " m D+." : "" }));
+      s.push(sess(d(5), "longue", w.block === "Endurance fondamentale" ? "Sortie longue · facile" : w.block === "Développement" && w.i % 2 === 0 ? "Sortie longue · avec rappel" : "Sortie longue · avec sac", w.block === "Développement" && w.i % 2 === 0 ? rappel(longMin) : easy(longMin, "Course facile, montées raides marchées"), { note: w.prepRace ? "Semaine idéale pour une course de préparation : ≈ " + Math.round(race.km / 2) + " km et " + Math.round(race.dplus / 2) + " m D+." : "" }));
       s.push(sess(d(6), "longue", "Sortie enchaînée · jambes fatiguées", easy(M * 0.18, "Course facile sur jambes fatiguées")));
     }
     return s.filter(function (x) { return x.date < race.date; });
@@ -283,8 +294,8 @@
 
   function gates(weeks, an, longPeak) {
     var g = [];
-    var lastBase = weeks.filter(function (w) { return w.block === "Base"; }).pop();
-    if (lastBase) g.push({ key: "base-" + lastBase.monday, date: addDays(lastBase.monday, 6), c: "Fin de la Base : " + String(lastBase.hours).replace(".", ",") + " h/semaine sans séance orange ni rouge" });
+    var lastBase = weeks.filter(function (w) { return w.block === "Endurance fondamentale"; }).pop();
+    if (lastBase) g.push({ key: "base-" + lastBase.monday, date: addDays(lastBase.monday, 6), c: "Fin de l'endurance fondamentale : " + String(lastBase.hours).replace(".", ",") + " h/semaine sans séance orange ni rouge" });
     weeks.filter(function (w) { return w.choc; }).forEach(function (w) { g.push({ key: "choc-" + w.monday, date: addDays(w.monday, 6), c: (an.stages > 1 ? "Bloc 3 jours" : "Week-end choc") + " du " + longDate(addDays(w.monday, an.stages > 1 ? 4 : 5)) + " sans douleur le lendemain" }); });
     var t = weeks.filter(function (w) { return w.block === "Affûtage"; })[0];
     if (t) g.push({ key: "go-" + t.monday, date: t.monday, c: "Avant l'affûtage : sortie de " + longPeak.toFixed(1).replace(".", ",") + " h faite, tibia calme" });
