@@ -1,8 +1,6 @@
 # NaqRun
 
-**Reprendre la course pas à pas après une blessure, puis préparer un ultra-trail avec un seul objectif : être finisher.**
-
-NaqRun est une appli iPhone (une page web qui s'installe sur l'écran d'accueil). Elle guide d'abord une reprise de charge progressive, pilotée par la douleur (conçue pour une périostite tibiale). Une fois la charge de base retrouvée, elle construit un programme ultra-trail adapté à la course choisie. Toutes les séances sont structurées en temps et en zones de fréquence cardiaque, et s'envoient sur la montre Garmin en un clic via Intervals.icu.
+**Application de reprise progressive après blessure, pour viser un objectif par la suite.**
 
 - **Reprise après blessure** : 17 paliers de 20 à 90 min, chaque marche ajoutant au plus 10 % (étude Garmin-RUNSAFE, BJSM 2025), une semaine de consolidation toutes les 4 semaines, dans une semaine type : footing palier (seule séance qui fait progresser), footing cadence, vélo ou elliptique, rando-course. Trois notes de douleur par course (pendant, après, lendemain matin) donnent un verdict vert, « orange pendant » (douleur pendant la course seulement), orange ou rouge. Trois signes d'arrêt bloquent la course. Relief : pentes douces courues, montées raides et descentes marchées.
 - **Test de passage** : paliers terminés, 3 semaines au vert, 15 sauts sur une jambe et 25 montées sur pointe sans douleur, feu vert médical facultatif.
