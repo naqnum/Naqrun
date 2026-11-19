@@ -13,7 +13,7 @@ s = E.computeState(prof, [g('2026-11-24'), { ...g('2026-11-26'), during: 7 }], '
 assert.equal(s.level, 6); assert.equal(s.resting, true);
 assert.ok(E.sessionsOn(prof, s, '2026-11-28', null).every(x => x.kind === 'velo'));
 // Orange : même palier, série remise à zéro
-s = E.computeState(prof, [g('2026-11-24'), { ...g('2026-11-26'), during: 4 }], '2026-11-27');
+s = E.computeState(prof, [g('2026-11-24'), { ...g('2026-11-26'), after: 4 }], '2026-11-27');
 assert.equal(s.level, 8); assert.equal(s.streak, 0);
 // Signe d'arrêt
 s = E.computeState(prof, [{ ...g('2026-11-24'), flags: [true, false, false] }], '2026-11-25');
@@ -84,4 +84,17 @@ const prc = E.projection({ ...cp, rythme: 'dynamique' }, E.computeState(cp, [], 
 console.log('dynamique + consolidation : base', prc.baseDate, 'programme', prc.switchDate);
 // ancienne échelle → nouvelle
 assert.equal(E.LADDER_V1[6], 8); assert.equal(E.LEVELS[7].run, 40);
+// « Orange pendant » : douleur pendant seulement
+const j = d => ({ ...g(d), during: 5, after: 2, morning: 0 });
+assert.equal(E.verdict(j('2026-11-24')), 'jaune');
+assert.equal(E.verdict({ ...j('2026-11-24'), morning: 2 }), 'orange');
+// série conservée : vert, jaune, vert → palier suivant
+s = E.computeState(prof, [g('2026-11-24'), j('2026-11-26'), g('2026-12-01')], '2026-12-02');
+assert.equal(s.level, 9);
+// deux jaunes de suite → orange : série remise à zéro
+s = E.computeState(prof, [g('2026-11-24'), j('2026-11-26'), j('2026-12-01'), g('2026-12-03')], '2026-12-04');
+assert.equal(s.logs[2]._v, 'orange'); assert.equal(s.level, 8); assert.equal(s.streak, 1);
+// en programme : un jaune n'allège pas la semaine, deux de suite oui
+s = E.computeState(p2, [j('2027-02-20')], '2027-02-21'); assert.equal(Object.keys(s.reduce).length, 0);
+s = E.computeState(p2, [j('2027-02-20'), j('2027-02-23')], '2027-02-24'); assert.equal(Object.keys(s.reduce).length, 1);
 console.log('OK');

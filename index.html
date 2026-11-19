@@ -18,7 +18,7 @@
 :root{
   --bg:#0E0F11;--surface:#1A1C20;--surface2:#22252A;--text:#F2F2F0;--muted:#A6AAB1;--border:#2B2E34;
   --accent:#FF7A1A;--accent-text:#140A02;--soft:#2A1D12;--soft-text:#FFB27A;
-  --g-bg:#15301F;--g:#7FD8A0;--o-bg:#3A2410;--o:#FFB066;--r-bg:#3A1614;--r:#FF948A;
+  --g-bg:#15301F;--g:#7FD8A0;--y-bg:#33300F;--y:#F2D46B;--o-bg:#3A2410;--o:#FFB066;--r-bg:#3A1614;--r:#FF948A;
   --head:'Space Grotesk',system-ui,sans-serif;--body:'Inter',system-ui,-apple-system,sans-serif;
   --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
 }
@@ -35,7 +35,7 @@ p{margin:0}
 .hdr{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
 .chip.soft{background:var(--soft);color:var(--soft-text)}
-.chip.vert{background:var(--g-bg);color:var(--g)}.chip.orange{background:var(--o-bg);color:var(--o)}.chip.rouge,.chip.stop{background:var(--r-bg);color:var(--r)}
+.chip.vert{background:var(--g-bg);color:var(--g)}.chip.jaune{background:var(--y-bg);color:var(--y)}.chip.orange{background:var(--o-bg);color:var(--o)}.chip.rouge,.chip.stop{background:var(--r-bg);color:var(--r)}
 .dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
 .hero{display:flex;align-items:baseline;gap:6px}
 .hero b{font-family:var(--head);font-weight:700;font-size:72px;line-height:.9}
@@ -133,7 +133,7 @@ function S() { return E.computeState(DB.profile, DB.logs, today()); }
 function cap(x) { return x.charAt(0).toUpperCase() + x.slice(1); }
 function num(x) { return String(x).replace(".", ","); }
 function chip(v, prov) {
-  var lab = { vert: "Verte", orange: "Orange", rouge: "Rouge", stop: "Arrêt" }[v];
+  var lab = { vert: "Verte", jaune: "Orange pendant", orange: "Orange", rouge: "Rouge", stop: "Arrêt" }[v];
   return '<span class="chip ' + v + '"><span class="dot"></span>' + lab + (prov && v !== "stop" ? " (provisoire)" : "") + "</span>";
 }
 function hm(min) { min = Math.round(min); if (min < 60) return min + " min"; var h = Math.floor(min / 60), m = min % 60; return h + " h" + (m ? " " + String(m).padStart(2, "0") : ""); }
@@ -204,6 +204,7 @@ function sessionCard(sess, key, label) {
     '<div class="hero"><b>' + Math.round(min) + '</b><span>min au total</span></div>' +
     '<p style="font-family:var(--head);font-weight:700;font-size:20px">' + esc(sess.title) + '</p><p class="muted">' + esc(sub) + "</p>" +
     stepsHtml(sess.blocks) + (sess.note ? '<div class="notice">' + esc(sess.note) + "</div>" : "") +
+    (sess.kind !== "velo" ? '<p class="muted">Pendant la course : au-delà de 3/10, ralentis ou marche. Au-delà de 5/10, ou si la douleur augmente, arrête et rentre en marchant.</p>' : "") +
     '<button class="primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix 7X</button>" + msgHtml(key) +
     (sess.kind !== "velo" ? '<button data-act="tolog" data-key="' + key + '">J\'ai fait la séance : remplir le journal</button>' : "") + "</section>";
 }
@@ -285,9 +286,10 @@ function vJournal() {
 function stat(v, l) { return '<div class="stat"><b>' + esc(v) + "</b><span>" + esc(l) + "</span></div>"; }
 function slider(label, key, val) { return '<label class="field"><span class="row">' + esc(label) + ' <span class="val" id="o-' + key + '">' + val + '/10</span></span><input type="range" min="0" max="10" value="' + val + '" data-pain="' + key + '"></label>'; }
 function verdictHtml(d) {
-  var v = E.verdict(d), prov = d.morning == null;
+  var prev = S().logs.filter(function (l) { return l.date <= d.date; }).pop();
+  var v = E.verdictInContext(d, prev ? prev._v : null), prov = d.morning == null;
   var counts = d.kind === "palier" || (DB.profile.rythme === "dynamique" && d.kind === "cadence");
-  var m = { vert: counts ? "Séance validée. Deux séances vertes qui comptent, de suite : palier suivant." : "Séance validée (elle ne fait pas monter de palier).", orange: "Tu refais le même palier.", rouge: "Recul de 2 paliers et 48 h sans course.", stop: "Arrête la course et demande un avis médical." }[v];
+  var m = { vert: counts ? "Séance validée. Deux séances vertes qui comptent, de suite : palier suivant." : "Séance validée (elle ne fait pas monter de palier).", jaune: "Douleur pendant la course seulement : pas de montée sur cette séance, mais ta série de séances vertes est conservée et la semaine n\'est pas allégée. Deux fois de suite, ça compte comme un orange.", orange: (prev && prev._v === "jaune" && E.verdict(d) === "jaune" ? "Deuxième « orange pendant » de suite : " : "") + "Tu refais le même palier, série remise à zéro (en programme : semaine suivante allégée).", rouge: "Recul de 2 paliers et 48 h sans course.", stop: "Arrête la course et demande un avis médical." }[v];
   return '<div class="row"><h2>Prévision</h2>' + chip(v, prov) + '</div><p class="muted">' + esc(m + (prov && v !== "stop" ? " Confirmée après la note du lendemain matin." : "")) + "</p>";
 }
 

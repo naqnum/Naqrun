@@ -47,12 +47,20 @@
 
   // ---------- Verdict d'une séance de course ----------
   // Seuils périostite : vert ≤ 3/10 pendant et après, rien le lendemain.
+  // « jaune » = orange pendant seulement : 4–5/10 pendant la course, mais ≤ 3 après et 0–1 au réveil
+  // (modèle de surveillance de la douleur : c'est la réponse à 24 h qui compte).
   function verdict(log) {
     if (log.flags && log.flags.some(Boolean)) return "stop";
     var m = log.morning;
     if (log.during >= 6 || log.after >= 6 || log.increasing || (m != null && m >= 4)) return "rouge";
-    if (log.during >= 4 || log.after >= 4 || (m != null && m >= 2)) return "orange";
+    if (log.after >= 4 || (m != null && m >= 2)) return "orange";
+    if (log.during >= 4) return "jaune";
     return "vert";
+  }
+  // Deux « orange pendant » de suite comptent comme un orange
+  function verdictInContext(log, prevVerdict) {
+    var v = verdict(log);
+    return v === "jaune" && prevVerdict === "jaune" ? "orange" : v;
   }
 
   // ---------- Semaines de consolidation ----------
@@ -67,8 +75,9 @@
   function computeState(profile, logs, today) {
     var s = { mode: "reprise", level: profile.startLevel || 6, streak: 0, stopped: false, lastDate: null, lastVerdict: null, restUntil: null, ultraStart: null, reduce: {}, events: [], returned: false };
     var sorted = (logs || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    var prevV = null;
     sorted.forEach(function (log) {
-      var v = verdict(log);
+      var v = verdictInContext(log, prevV); prevV = verdict(log) === "jaune" ? v : verdict(log);
       log._v = v; log._provisional = log.morning == null;
       s.lastDate = log.date; s.lastVerdict = v;
       if (profile.switchDate && s.mode === "reprise" && !s.returned && log.date >= profile.switchDate) { s.mode = "ultra"; s.ultraStart = profile.switchDate; }
@@ -84,6 +93,7 @@
       }
       if (s.mode === "ultra") { if (v === "orange") s.reduce[addDays(mondayOf(log.date), 7)] = true; return; }
       if (v === "orange") { s.streak = 0; return; }
+      if (v === "jaune") return; // pas de montée sur cette séance, série conservée
       // vert : seules les séances « palier » font monter
       // rythme « dynamique » : le footing cadence vert compte aussi → jusqu'à un palier par semaine
       if (isConsolidation(profile, log.date)) return;
@@ -353,7 +363,7 @@
     return projection(profile, state, today, null, 80).switchDate || addDays(today, 560);
   }
 
-  var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, LADDER_V1: LADDER_V1, isConsolidation: isConsolidation, PHASES: PHASES, verdict: verdict, computeState: computeState, passage: passage,
+  var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, LADDER_V1: LADDER_V1, isConsolidation: isConsolidation, PHASES: PHASES, verdict: verdict, verdictInContext: verdictInContext, computeState: computeState, passage: passage,
     repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, weekSessions: weekSessions,
     totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal, prepStart: prepStart,
     addDays: addDays, diffDays: diffDays, todayStr: todayStr, longDate: longDate, monthYear: monthYear, mondayOf: mondayOf, weekday: weekday };

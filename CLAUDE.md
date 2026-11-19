@@ -10,4 +10,5 @@
 - Séances toujours structurées en temps et zones de FC (jamais en distance ni en allure). Objectif unique : être finisher.
 - Pas de séances de renfo dans le programme (demande de l'utilisateur).
 - Paliers : chaque marche ≤ 10 % de la précédente (risque de blessure accru au-delà de 10 % de la plus longue sortie des 30 derniers jours). Une semaine de consolidation toutes les 4 semaines (remodelage osseux).
+- « Orange pendant » (jaune) : 4–5/10 pendant la course seulement, ≤ 3 après, 0–1 au réveil → pas de montée, série conservée, pas d'allègement ; deux de suite = orange.
 - Ne pas affaiblir les règles de sécurité douleur (signes d'arrêt, recul sur rouge) sans demande explicite.
