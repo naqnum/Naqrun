@@ -364,21 +364,64 @@
     }
     return out;
   }
+  // ---------- Semaine réelle : séances faites, rattrapées, décalées ----------
+  // runs : jours où tu as réellement couru (montre + journal). Les séances passées sont marquées faites
+  // (même faites en retard), la séance progression manquée passe en priorité, et les courses restantes
+  // sont redistribuées avec au moins un jour sans course entre deux sorties.
+  function reconcileWeek(list, runs, today) {
+    var runSet = {}; (runs || []).forEach(function (d) { runSet[d] = true; });
+    var used = {}, out = [], prio = { palier: 0, cadence: 1, footing: 1, vallon: 2, rando: 3, cote: 2, longue: 4 };
+    var isRunS = function (x) { return x.kind !== "velo" && x.kind !== "renfo"; };
+    var past = list.filter(function (x) { return isRunS(x) && x.date < today; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    var plannedDays = {}; list.forEach(function (x) { if (isRunS(x)) plannedDays[x.date] = true; });
+    var pending = [];
+    past.forEach(function (x) {
+      if (runSet[x.date] && !used[x.date]) { used[x.date] = true; out.push(Object.assign({}, x, { done: true })); return; }
+      var late = Object.keys(runSet).sort().filter(function (d) { return d > x.date && d <= today && !used[d] && !plannedDays[d] && diffDays(x.date, d) <= 3; })[0];
+      if (late) { used[late] = true; out.push(Object.assign({}, x, { done: true, doneOn: late, origDate: x.origDate || x.date, date: late })); return; }
+      if (x.kind === "palier") pending.push(Object.assign({}, x, { origDate: x.origDate || x.date, catchUp: true }));
+      else out.push(Object.assign({}, x, { missed: true }));
+    });
+    var future = list.filter(function (x) { return isRunS(x) && x.date >= today; });
+    future.forEach(function (x) { if (x.date === today && runSet[today] && !used[today]) { used[today] = true; out.push(Object.assign({}, x, { done: true })); } else pending.push(x); });
+    pending.sort(function (a, b) { return (prio[a.kind] || 5) - (prio[b.kind] || 5) || (a.date < b.date ? -1 : 1); });
+    var last = Object.keys(runSet).filter(function (d) { return d <= today; }).sort().pop() || null;
+    var slots = future.map(function (x) { return x.date; }).filter(function (d) { return !used[d]; }).sort();
+    pending.forEach(function (x) {
+      var d = x.catchUp ? today : x.date;
+      if (last && diffDays(last, d) < 2) d = addDays(last, 2);
+      if (d < today) d = today;
+      if (d !== x.date) x = Object.assign({}, x, { origDate: x.origDate || x.date, date: d, autoMoved: true });
+      out.push(x); last = d;
+    });
+    list.filter(function (x) { return !isRunS(x); }).forEach(function (x) { out.push(x); });
+    return out;
+  }
+
   function sessionsOn(profile, state, date, race, ctx) {
     if (state.stopped) return [];
     if (state.mode === "ultra" && !race) return [];
     var moves = profile.moves || {};
-    var out = rawSessions(profile, state, addDays(date, -14), addDays(date, 14), race).map(function (x) {
+    var all = rawSessions(profile, state, addDays(date, -14), addDays(date, 14), race).map(function (x) {
       var mv = moves[x.date + "|" + x.kind];
       if (mv === "skip") return null;
-      return mv ? Object.assign({}, x, { origDate: x.date, date: mv }) : x;
-    }).filter(function (x) { return x && x.date === date; });
+      return mv ? Object.assign({}, x, { origDate: x.date, date: mv, manual: true }) : x;
+    }).filter(Boolean);
+    if (ctx && ctx.runs && ctx.today) {
+      var mon = mondayOf(ctx.today), sun = addDays(mon, 6);
+      if (date >= mon && date <= addDays(sun, 2)) {
+        var wk = all.filter(function (x) { return (x.origDate || x.date) >= mon && (x.origDate || x.date) <= sun; });
+        var rest = all.filter(function (x) { return wk.indexOf(x) < 0; });
+        all = rest.concat(reconcileWeek(wk, ctx.runs, ctx.today));
+      }
+    }
+    var out = all.filter(function (x) { return x.date === date; });
     if (state.restUntil && date <= state.restUntil) out = out.filter(function (x) { return x.kind === "velo"; });
     return out.map(function (x) { return adjust(x, state, ctx, date); });
   }
-  function weekSessions(profile, state, monday, race) {
+  function weekSessions(profile, state, monday, race, ctx) {
     var out = [];
-    for (var i = 0; i < 7; i++) out = out.concat(sessionsOn(profile, state, addDays(monday, i), race));
+    for (var i = 0; i < 9; i++) out = out.concat(sessionsOn(profile, state, addDays(monday, i), race, ctx).filter(function (x) { return i < 7 || (x.origDate && x.origDate < addDays(monday, 7)); }));
     return out;
   }
 
@@ -426,8 +469,9 @@
 
   // ---------- Export Intervals.icu ----------
   function dur(min) { var s = Math.round(min * 60); return s % 60 === 0 ? (s / 60) + "m" : s + "s"; }
+  // Zones Nolio : Z1 = endurance (sous SV1), Z2 = un cran au-dessus. À régler à l'identique dans Intervals.icu.
   function stepLine(st) {
-    var z = st.k === "marche" ? "Z1 HR" : st.k === "cote" ? "Z3 HR" : "Z2 HR";
+    var z = st.k === "cote" ? "Z2 HR" : "Z1 HR";
     // libellés sans chiffres pour ne pas perturber l'analyse d'Intervals.icu
     var l = st.label || "", lbl;
     if (/^Échauffement/.test(l)) lbl = "Échauffement";
@@ -464,7 +508,7 @@
   }
 
   var api = { LEVELS: LEVELS, MAX_LEVEL: MAX_LEVEL, LADDER_V1: LADDER_V1, isConsolidation: isConsolidation, PHASES: PHASES, verdict: verdict, verdictInContext: verdictInContext, quality: quality, readiness: readiness, adjust: adjust, computeState: computeState, passage: passage,
-    repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, sessionKey: sessionKey, weekSessions: weekSessions,
+    repriseWeek: repriseWeek, projection: projection, analyseRace: analyseRace, buildProgram: buildProgram, sessionsOn: sessionsOn, sessionKey: sessionKey, reconcileWeek: reconcileWeek, weekSessions: weekSessions,
     totalMin: totalMin, intervalsText: intervalsText, intervalsEvent: intervalsEvent, estimateOptimal: estimateOptimal, prepStart: prepStart,
     addDays: addDays, diffDays: diffDays, todayStr: todayStr, longDate: longDate, monthYear: monthYear, mondayOf: mondayOf, weekday: weekday };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Engine = api;

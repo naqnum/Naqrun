@@ -32,3 +32,6 @@ Les données (journal, clé API) restent dans le stockage du téléphone, jamais
 | `tests/engine.test.js` | Tests du moteur : `node tests/engine.test.js` |
 
 NaqRun ne remplace pas un avis médical.
+
+- Zones de fréquence cardiaque Z1–Z5 réglables (comme dans Nolio)
+- Semaine mise à jour automatiquement avec tes sorties réelles (Strava/Garmin via Intervals.icu)

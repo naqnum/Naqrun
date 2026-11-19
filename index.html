@@ -35,6 +35,7 @@ p{margin:0}
 .hdr{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
 .chip.soft{background:var(--soft);color:var(--soft-text)}
+.zchip{display:inline-block;border:1px solid;border-radius:999px;padding:0 7px;font-size:11px;font-weight:600;line-height:18px;white-space:nowrap}
 .chip.vert{background:var(--g-bg);color:var(--g)}.chip.jaune{background:var(--y-bg);color:var(--y)}.chip.orange{background:var(--o-bg);color:var(--o)}.chip.rouge,.chip.stop{background:var(--r-bg);color:var(--r)}
 .dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
 .hero{display:flex;align-items:baseline;gap:6px}
@@ -132,7 +133,7 @@ select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:
 "use strict";
 var E = window.Engine;
 var KEY = "naqrun.v1";
-var DEFAULT = { profile: { startLevel: 5, ladderV: 3, cycleStart: null, switchDate: null, hop: false, heel: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "", hoursMax: 10, h0: 4.5, hr: { z1: [129, 153], z2: [153, 166], z3: [166, 173] }, ref: { km: 29.6, dplus: 637, hours: 3.45 }, race: null }, logs: [], sent: {} };
+var DEFAULT = { profile: { startLevel: 5, ladderV: 3, cycleStart: null, switchDate: null, hop: false, heel: false, kine: false, clearedStop: null, gates: {}, intervalsId: "", intervalsKey: "", hoursMax: 10, h0: 4.5, zones: [[129, 153], [153, 166], [166, 173], [173, 180], [180, 192]], ref: { km: 29.6, dplus: 637, hours: 3.45 }, race: null }, logs: [], sent: {} };
 var RACE_EXAMPLE = { name: "Raid de l'Archange", date: "2027-06-17", km: 280, dplus: 3000, stages: 3, autonomy: true, terrain: "roulant", night: false, cutoffH: null, confirmed: false };
 var KINDS = { palier: "Footing progression", cadence: "Footing cadence", footing: "Footing facile", vallon: "Vallon", rando: "Rando-course", longue: "Sortie longue", cote: "Côtes marchées", velo: "Vélo / elliptique", autre: "Autre course" };
 
@@ -142,6 +143,7 @@ function load() {
     if (x && x.profile) {
       var p = Object.assign({}, DEFAULT.profile, x.profile);
       p.ref = Object.assign({}, DEFAULT.profile.ref, x.profile.ref || {});
+      if (!p.zones) p.zones = DEFAULT.profile.zones.map(function (z) { return z.slice(); });
       if (p.ladderV !== 3) { p.startLevel = 5; p.ladderV = 3; } // échelle v3 : départ à 2 × 14 min (niveau actuel de Nour)
       return { profile: p, logs: x.logs || [], sent: x.sent || {} };
     }
@@ -156,7 +158,8 @@ var UI = { tab: (location.hash || "#today").slice(1), draft: null, msg: {}, race
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
 function today() { return E.todayStr(); }
 function S() { return E.computeState(DB.profile, DB.logs, today(), { acts: ACTS.list }); }
-function CTX() { return { today: today(), readiness: E.readiness(WELL.list, today()) }; }
+function runDays() { var d = {}; DB.logs.forEach(function (l) { if (l.kind !== "velo") d[l.date] = 1; }); (ACTS.list || []).forEach(function (a) { if (a.run) d[a.date] = 1; }); return Object.keys(d); }
+function CTX() { return { today: today(), readiness: E.readiness(WELL.list, today()), runs: runDays() }; }
 function cap(x) { return x.charAt(0).toUpperCase() + x.slice(1); }
 function num(x) { return String(x).replace(".", ","); }
 function chip(v, prov) {
@@ -165,12 +168,15 @@ function chip(v, prov) {
 }
 function hm(min) { min = Math.round(min); if (min < 60) return min + " min"; var h = Math.floor(min / 60), m = min % 60; return h + " h" + (m ? " " + String(m).padStart(2, "0") : ""); }
 function hh(hours) { return hm(hours * 60); }
+var ZCOL = ["#888888", "#11a9ed", "#72ea24", "#ff9e0d", "#ff0035"], ZNAME = ["Endurance", "Un cran au-dessus", "Tempo", "Seuil", "VMA"];
+function zones() { return DB.profile.zones || DEFAULT.profile.zones; }
+function zchip(i) { var z = zones()[i]; return '<span class="zchip" style="border-color:' + ZCOL[i] + ';color:' + ZCOL[i] + '">Z' + (i + 1) + " · " + z[0] + "–" + z[1] + "</span>"; }
 function stepsHtml(blocks) {
   function one(st) {
     var kind = st.k === "marche" ? "Marche" : st.k === "cote" ? "Montée" : st.k === "velo" ? "Vélo" : "Course";
-    var z = DB.profile.hr || { z1: [129, 153], z2: [153, 166] };
-    var tr = DB.profile.hrTrusted;
-    var zone = st.k === "marche" ? "" : st.k === "cote" ? " · un cran au-dessus" + (tr ? " (FC " + z.z2[0] + "–" + z.z2[1] + ")" : "") : " · aisance respiratoire" + (tr ? " (FC " + z.z1[0] + "–" + z.z1[1] + ")" : " (FC indicative ≈ " + z.z1[0] + "–" + z.z1[1] + ")");
+    var lign = /^Ligne|^Cadence/.test(st.label || "");
+    var zone = st.k === "marche" ? "" : lign ? " · vif et relâché" : " · " + zchip(st.k === "cote" ? 1 : 0) + (DB.profile.hrTrusted ? "" : " <span class=\"muted\">indicatif</span>");
+    if (st.k === "velo") zone = " · " + zchip(0);
     return '<li><i class="' + st.k + '" aria-hidden="true"></i><div><div class="t">' + esc(st.label || kind) + '</div><div class="d">' + hm(st.min < 1 ? 0 : st.min) .replace(/^0 min$/, Math.round(st.min * 60) + " s") + zone + "</div></div></li>";
   }
   return '<ul class="steps">' + blocks.map(function (b) {
@@ -203,7 +209,7 @@ var ACTS = { at: 0, list: null, loading: false }, WELL = { list: null };
 function isRun(t) { return /Run/i.test(t || ""); }
 function actInfo(a) {
   var z = a.icu_hr_zone_times, hi = null;
-  if (z && z.length > 2) { var tot = z.reduce(function (u, v) { return u + (v || 0); }, 0); if (tot) hi = z.slice(2).reduce(function (u, v) { return u + (v || 0); }, 0) / tot; }
+  if (z && z.length > 2) { var tot = z.reduce(function (u, v) { return u + (v || 0); }, 0); if (tot) hi = z.slice(1).reduce(function (u, v) { return u + (v || 0); }, 0) / tot; }
   var sec = a.moving_time || a.elapsed_time || 0, cad = a.average_cadence ? Math.round(a.average_cadence < 120 ? a.average_cadence * 2 : a.average_cadence) : null;
   return { date: String(a.start_date_local || "").slice(0, 10), run: isRun(a.type), type: a.type, min: Math.round(sec / 60), name: a.name || "",
     km: ((a.distance || 0) / 1000).toFixed(2).replace(".", ","), time: Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"),
@@ -272,11 +278,11 @@ function weekList(sessions, prefix) {
     var key = prefix + j; SESSIONS[key] = x;
     var open = UI.open === key;
     var t = today(), st = "";
-    if (x.date <= t && ACTS.list) {
-      var done = actsOn(x.date).some(function (a) { return x.kind === "velo" ? !a.run : a.run; }) || (x.kind !== "velo" && DB.logs.some(function (l) { return l.date === x.date; }));
-      st = done ? ' <span class="chip vert">Faite</span>' : (x.date < t ? ' <span class="chip soft">Non faite</span>' : "");
-    }
-    return '<details class="sessd" data-key="' + key + '"' + (open ? " open" : "") + '><summary class="sess"><span>' + esc(cap(E.longDate(x.date))) + (x.origDate ? " (reportée)" : "") + st + '<br><span class="muted">' + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><span class="chev" aria-hidden="true">›</span></summary>' +
+    if (x.done) st = ' <span class="chip vert">Faite' + (x.doneOn && x.origDate ? " (prévue " + E.longDate(x.origDate).split(" ")[0] + ")" : "") + "</span>";
+    else if (x.missed) st = ' <span class="chip soft">Non faite</span>';
+    else if (x.autoMoved) st = ' <span class="chip jaune">Décalée</span>';
+    else if (x.kind === "velo" && x.date < t && ACTS.list) st = actsOn(x.date).some(function (a) { return !a.run; }) ? ' <span class="chip vert">Faite</span>' : ' <span class="chip soft">Non faite</span>';
+    return '<details class="sessd" data-key="' + key + '"' + (open ? " open" : "") + '><summary class="sess"><span>' + esc(cap(E.longDate(x.date))) + (x.manual ? " (reportée)" : "") + st + '<br><span class="muted">' + esc(x.title) + " · " + hm(E.totalMin(x.blocks)) + '</span></span><span class="chev" aria-hidden="true">›</span></summary>' +
       '<div class="sessbody"><span class="chip soft" style="align-self:flex-start">' + esc(KINDS[x.kind] || x.kind) + "</span>" + stepsHtml(x.blocks) + (x.note ? '<div class="notice">' + esc(x.note) + "</div>" : "") +
       '<button class="small primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix</button>" + msgHtml(key) + moveHtml(x, key) + "</div></details>";
   }).join("");
@@ -301,15 +307,16 @@ function vToday() {
   if (pending) h += '<section class="card"><div class="row"><h2>Note du matin</h2><span class="muted">' + esc(E.longDate(pending.date)) + '</span></div><label class="field"><span class="row">Douleur au tibia au réveil <span class="val" id="mv">0/10</span></span><input type="range" min="0" max="10" value="0" id="morningQuick"></label><button class="primary" data-act="morning" data-id="' + pending.id + '">Valider la note</button></section>';
   var race = p.race;
   if (!s.stopped) {
-    var list = E.sessionsOn(p, s, t, race, CTX());
+    var all = E.sessionsOn(p, s, t, race, CTX()), list = all.filter(function (x) { return !x.done; });
+    all.filter(function (x) { return x.done; }).forEach(function (x) { h += '<div class="notice ok">' + esc(x.title) + " : faite aujourd'hui.</div>"; });
     if (s.mode === "ultra" && !race) h += '<section class="card"><h2>Définis ta course</h2><p class="muted">Ta reprise est validée. Renseigne ta course objectif pour générer le programme.</p><button class="primary" data-act="tab" data-tab="course">Fiche course</button></section>';
     else if (list.length) list.forEach(function (x, i) {
-      if (x.kind !== "velo" && ranOn(E.addDays(t, -1)) && !ranOn(t)) h += '<div class="notice">Tu as déjà couru hier. Pour le tibia, mieux vaut un jour sans course entre deux sorties : décale « ' + esc(x.title) + ' » à demain (bouton sous la séance) ou fais du vélo aujourd\'hui.</div>';
+      if (x.catchUp) h += '<div class="notice">Séance progression non faite à sa date : elle passe en priorité.</div>';
       h += sessionCard(x, "today" + i, "Séance du jour");
     });
     else {
       var next = null;
-      for (var i = 1; i <= 14 && !next; i++) { var l2 = E.sessionsOn(p, s, E.addDays(t, i), race); if (l2.length) next = l2[0]; }
+      for (var i = 1; i <= 14 && !next; i++) { var l2 = E.sessionsOn(p, s, E.addDays(t, i), race, CTX()).filter(function (x) { return !x.done; }); if (l2.length) next = l2[0]; }
       h += '<section class="card"><h2>Repos aujourd\'hui</h2><p class="muted">' + (s.resting ? "48 h de repos après une séance rouge : vélo possible, pas de course." : "Pas de séance prévue.") + "</p>" + (next ? '<p>Prochaine séance : <strong>' + esc(next.title) + "</strong>, " + esc(E.longDate(next.date)) + ".</p>" : "") + "</section>";
     }
   }
@@ -378,9 +385,9 @@ function vPlan() {
   var s = S(), t = today(), p = DB.profile, h = "", monday = E.mondayOf(t);
   h += '<header class="hdr"><div><p class="muted">' + (s.mode === "ultra" ? "Programme ultra-trail · finisher" : "Reprise de charge · périostite") + '</p><h1>Plan</h1></div></header>';
   if (s.mode === "reprise") {
-    h += '<section class="card"><h2>Cette semaine</h2><p class="muted">' + (E.isConsolidation(p, monday) ? "Semaine de consolidation : volume réduit d’environ 25 %, pas de montée de palier. " : "") + "Seul le footing progression fait monter de palier, de 10 % au plus. Une semaine sur quatre est une semaine de consolidation.</p>" + weekList(E.weekSessions(p, s, monday, null), "w0s") + "</section>";
+    h += '<section class="card"><h2>Cette semaine</h2><p class="muted">' + (E.isConsolidation(p, monday) ? "Semaine de consolidation : volume réduit d’environ 25 %, pas de montée de palier. " : "") + "Seul le footing progression fait monter de palier, de 10 % au plus. Une semaine sur quatre est une semaine de consolidation.</p>" + weekList(E.weekSessions(p, s, monday, null, CTX()).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; }), "w0s") + "</section>";
     if (ACTS.list) {
-      var planned = E.weekSessions(p, s, monday, null).map(function (x) { return x.date; });
+      var planned = E.weekSessions(p, s, monday, null, CTX()).filter(function (x) { return x.done; }).map(function (x) { return x.date; });
       var extra = ACTS.list.filter(function (a) { return a.date >= monday && a.date <= t && planned.indexOf(a.date) < 0; });
       if (extra.length) h += '<section class="card"><h2>Sorties hors plan cette semaine</h2>' + extra.map(function (a) { return '<div class="sess"><span>' + esc(cap(E.longDate(a.date))) + '<br><span class="muted">' + esc(a.name || a.type) + " · " + hm(a.min) + "</span></span></div>"; }).join("") + '<p class="muted">Récupérées depuis ta montre (Intervals.icu). Pense à les noter dans le journal pour qu\'elles comptent dans ta progression.</p></section>';
     } else if (ivReady()) h += '<p class="muted">Chargement de tes sorties de la semaine…</p>';
@@ -487,8 +494,10 @@ function vSettings() {
     '<button class="small" data-act="ivtest">Enregistrer et tester la connexion</button>' + (UI.msg.iv ? '<div class="notice ' + UI.msg.iv.t + '">' + esc(UI.msg.iv.m) + "</div>" : "") + "</section>";
   h += '<section class="card"><h2>Reprise</h2><label class="field">Palier de départ<select id="startLevel">' + E.LEVELS.map(function (lv) { return '<option value="' + lv.n + '"' + (lv.n === p.startLevel ? " selected" : "") + ">" + lv.n + " · " + esc(lv.title) + "</option>"; }).join("") + "</select></label>" + (p.switchDate ? '<button class="small" data-act="unswitch">Revenir en mode reprise</button>' : "") + "</section>";
   if (S().mode === "ultra") h += '<section class="card"><h2>Programme ultra</h2><label class="field">Heures maximum par semaine<input type="number" id="hoursMax" min="5" max="16" step="0.5" value="' + p.hoursMax + '"></label><p class="muted">Le temps d\'entraînement que tu peux consacrer au pic de ta préparation (course, rando et vélo compris). Le programme monte progressivement jusqu\'à ce plafond sans jamais le dépasser, même si la course en demanderait plus.</p></section>';
-  var hr = p.hr || DEFAULT.profile.hr;
-  h += '<section class="card"><h2>Zones de fréquence cardiaque</h2><p class="muted">Reprises de tes zones Nolio (FC max 192, SV1 150, SV2 175), mais à confirmer. Tant qu\'elles ne le sont pas, c\'est l\'aisance respiratoire qui guide tes footings : tu dois pouvoir parler en phrases complètes (effort ressenti 2 à 4 sur 10). La FC reste affichée à titre indicatif et ne bloque pas ta progression.</p><label class="check"><input type="checkbox" id="hrTrusted"' + (p.hrTrusted ? " checked" : "") + '>Mes zones sont confirmées (la FC compte dans l\'algorithme)</label><div class="btns"><label class="field">Endurance min<input type="number" inputmode="numeric" data-hr="z1.0" value="' + hr.z1[0] + '"></label><label class="field">Endurance max<input type="number" inputmode="numeric" data-hr="z1.1" value="' + hr.z1[1] + '"></label></div><div class="btns"><label class="field">Tempo min<input type="number" inputmode="numeric" data-hr="z2.0" value="' + hr.z2[0] + '"></label><label class="field">Tempo max<input type="number" inputmode="numeric" data-hr="z2.1" value="' + hr.z2[1] + '"></label></div></section>';
+  var zs = zones();
+  h += '<section class="card"><h2>Zones de fréquence cardiaque</h2><p class="muted">Tes zones Nolio (FC max 192, SV1 150, SV2 175). Tes footings visent la Z1 (endurance), les montées et rappels la Z2. Règle les mêmes zones dans Intervals.icu (Settings › Run › Heart rate zones) pour que la Fenix t\'alerte au bon moment.</p>' +
+    zs.map(function (z, i) { return '<div class="row" style="gap:8px"><span class="zchip" style="border-color:' + ZCOL[i] + ";color:" + ZCOL[i] + ';min-width:44px;text-align:center">Z' + (i + 1) + '</span><span class="muted" style="flex:1">' + ZNAME[i] + '</span><input type="number" inputmode="numeric" aria-label="Z' + (i + 1) + ' minimum" data-zone="' + i + '.0" value="' + z[0] + '" style="width:76px;flex:none"><span class="muted">–</span><input type="number" inputmode="numeric" aria-label="Z' + (i + 1) + ' maximum" data-zone="' + i + '.1" value="' + z[1] + '" style="width:76px;flex:none"></div>'; }).join("") +
+    '<p class="muted">Avec ta charge en baisse, ces valeurs sont à prendre avec des pincettes : tant qu\'elles ne sont pas confirmées, l\'aisance respiratoire guide tes footings (tu peux parler en phrases complètes).</p><label class="check"><input type="checkbox" id="hrTrusted"' + (p.hrTrusted ? " checked" : "") + '>Mes zones sont confirmées (la FC compte dans l\'algorithme)</label></section>';
   h += '<section class="card"><h2>Estimation des durées</h2>' +
     '<p class="muted">Course de référence pour estimer tes temps de course (par défaut ton trail de Fermanville sur Strava).</p><div class="btns"><label class="field">km<input type="number" inputmode="decimal" id="refKm" value="' + p.ref.km + '"></label><label class="field">D+ (m)<input type="number" inputmode="numeric" id="refDp" value="' + p.ref.dplus + '"></label><label class="field">Durée (h)<input type="number" inputmode="decimal" step="0.05" id="refH" value="' + p.ref.hours + '"></label></div></section>';
   h += '<section class="card"><h2>Sauvegarde</h2><p class="muted">Tes données sont sur ce téléphone. Copie la sauvegarde de temps en temps (dans Notes, par exemple).</p><div class="btns"><button class="small" data-act="export">Copier la sauvegarde</button><button class="small" data-act="import">Coller une sauvegarde</button></div>' + (UI.msg.bk ? '<div class="notice ' + UI.msg.bk.t + '">' + esc(UI.msg.bk.m) + "</div>" : "") + (UI.showImport ? '<textarea id="bkText" placeholder="Colle ta sauvegarde ici"></textarea><button class="small" data-act="doimport">Importer</button>' : "") + "</section>";
@@ -617,7 +626,7 @@ document.addEventListener("change", function (ev) {
   if (t.dataset.pass) { p[t.dataset.pass] = t.checked; save(); return render(); }
   if (t.dataset.gate) { p.gates[t.dataset.gate] = t.checked; save(); return render(); }
   if (t.dataset.race) { readRace(); var s2 = S(), box = document.getElementById("raceAnalysis"); if (box) box.innerHTML = raceAnalysis(UI.raceDraft, s2, E.prepStart(DB.profile, s2, today())); return; }
-  if (t.dataset.hr) { var k2 = t.dataset.hr.split("."); p.hr = p.hr || JSON.parse(JSON.stringify(DEFAULT.profile.hr)); if (+t.value > 60) { p.hr[k2[0]][+k2[1]] = +t.value; save(); } return; }
+  if (t.dataset.zone) { var k2 = t.dataset.zone.split(".").map(Number); p.zones = zones().map(function (z) { return z.slice(); }); if (+t.value > 60 && +t.value < 230) { p.zones[k2[0]][k2[1]] = +t.value; save(); } return; }
   if (t.id === "hrTrusted") { p.hrTrusted = t.checked; save(); return render(); }
   if (t.id === "startLevel") { p.startLevel = +t.value; save(); return; }
   if (t.id === "hoursMax") { p.hoursMax = Math.max(5, Math.min(16, +t.value || 10)); save(); return; }

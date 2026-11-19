@@ -138,4 +138,14 @@ assert.ok(!/\d/.test(E.intervalsText(pb.weeks[0].sessions[0].blocks).replace(/\d
 // FC non confirmée : le temps au-dessus de l'endurance ne bloque pas ; confirmée : oui
 assert.equal(E.quality({ kind: 'palier', hiShare: 0.5 }).length, 0);
 assert.equal(E.quality({ kind: 'palier', hiShare: 0.5, hrTrusted: true }).length, 1);
+// Semaine réelle : palier prévu mardi fait mercredi → cadence décalée à vendredi
+const p5 = { ...prof, startLevel: 5 }, s5 = E.computeState(p5, [], '2026-11-19');
+const ctx = { today: '2026-11-19', runs: ['2026-11-18'] };
+const wk2 = E.weekSessions(p5, s5, '2026-11-16', null, ctx);
+const pal = wk2.find(x => x.kind === 'palier'), cad = wk2.find(x => x.kind === 'cadence'), ran = wk2.find(x => x.kind === 'rando');
+console.log('semaine', wk2.map(x => x.date.slice(5) + ' ' + x.kind + (x.done ? ' fait' : '') + (x.autoMoved ? ' décalé' : '')).join(' | '));
+assert.ok(pal.done && pal.date === '2026-11-18');
+assert.equal(cad.date, '2026-11-20'); assert.ok(cad.autoMoved);
+assert.equal(ran.date, '2026-11-22');
+assert.equal(E.sessionsOn(p5, s5, '2026-11-19', null, ctx).filter(x => x.kind !== 'velo').length, 0);
 console.log('OK');
