@@ -58,9 +58,10 @@ button.opt span{font-size:12px;font-weight:400;color:var(--muted)}
 .dayblock{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:4px}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-h span{text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase}
-.day{flex-direction:column;justify-content:flex-start;align-items:center;gap:4px;min-height:56px;padding:6px 2px;border-radius:8px;border:1px solid transparent;background:var(--surface2);font-weight:500;min-width:0;overflow:hidden}
-.day b{font-size:14px;font-weight:600}.day.out{opacity:.35}.day.today{border-color:var(--accent)}.day.sel{background:var(--soft)}
-.day .dots{display:flex;gap:3px;min-height:8px}.day .dots i{width:8px;height:8px;border-radius:50%;box-sizing:border-box;border:2px solid currentColor;background:transparent}
+.calTitle{text-align:center;font-size:21px}.avatar{width:52px;height:52px;border-radius:50%;background:var(--soft);color:var(--soft-text);display:flex;align-items:center;justify-content:center;font-family:var(--head);font-weight:700;font-size:22px;flex:none}.mth{margin-top:16px;display:flex;flex-direction:column;gap:10px}.mth:first-child{margin-top:12px}
+.day{flex-direction:column;justify-content:flex-start;align-items:center;gap:4px;min-height:66px;padding:8px 2px;border-radius:8px;border:1px solid transparent;background:var(--surface2);font-weight:500;min-width:0;overflow:hidden}
+.day b{font-size:16px;font-weight:700}.day.out{opacity:.35}.day.today{border-color:var(--accent)}.day.sel{background:var(--soft)}
+.day .dots{display:flex;gap:3px;min-height:8px}.day .dots i{width:10px;height:10px;border-radius:50%;box-sizing:border-box;border:2px solid currentColor;background:transparent}
 .day .dots i.done{background:currentColor}.day .ct{display:none}
 .day.rest b{color:var(--g)}.day.rest{background:color-mix(in srgb,var(--g) 8%,var(--surface2))}
 .kv{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:32px;font-size:14px}
@@ -145,17 +146,24 @@ select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:
   nav.tabs button{font-size:11px;padding:6px 2px 0;min-width:0}
   nav.tabs button svg{padding:3px 8px}
 }
-/* Ordinateur : menu à gauche, colonne plus large, calendrier détaillé */
+.calwrap{display:flex;flex-direction:column;gap:14px}.calmain,.calside{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* Ordinateur : menu à gauche, toute la largeur, calendrier au centre */
 @media (min-width:900px){
   body{padding-left:220px}
-  main{max-width:820px;padding-top:32px;padding-bottom:48px}
+  main{max-width:none;padding:32px 40px 48px;display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));align-items:start;gap:16px}
+  main>.hdr,main>.seg,main>.notice,main>.calwrap,main>.full,main>details,main>.card.full{grid-column:1/-1}
+  main>.seg{max-width:560px}
+  main[data-view$=finish]{grid-template-columns:minmax(0,760px);justify-content:center}
+  .calwrap{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
+  .calTitle{font-size:26px}
+  .day{min-height:112px}
   nav.tabs{top:0;right:auto;width:220px;flex-direction:column;align-items:stretch;border-top:none;border-right:1px solid var(--border);justify-content:flex-start;padding:24px 12px}
   nav.tabs::before{content:"NaqRun";font-family:var(--head);font-weight:700;font-size:22px;padding:0 14px 18px;display:block}
   nav.tabs .in{flex-direction:column;max-width:none;gap:4px}
   nav.tabs button{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;min-height:48px;padding:0 14px;font-size:15px;border-radius:10px}
   nav.tabs button svg{padding:0;border-radius:0}
   nav.tabs button[aria-current=page]{background:var(--soft)}nav.tabs button[aria-current=page] svg{background:none}
-  .day{min-height:88px;align-items:stretch;text-align:left;padding:8px}
+  .day{align-items:stretch;text-align:left;padding:10px}
   .day .ct{display:block;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 }
 @media (max-width:340px){ .btns>*{flex:1 1 100%} }
@@ -168,7 +176,7 @@ select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:
   <button data-tab="plan"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M4 11h16"></path><path d="M8 15h2M14 15h2"></path></svg><span>Plan</span></button>
   <button data-tab="journal"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h11"></path><path d="M9 8h6"></path></svg><span>Journal</span></button>
   <button data-tab="data"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11M12 20V4M19 20v-6"></path></svg><span>Données</span></button>
-  <button data-tab="settings"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg><span>Réglages</span></button>
+  <button data-tab="settings"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg><span>Profil</span></button>
 </div></nav>
 <script src="engine.js"></script>
 <script>
@@ -196,8 +204,8 @@ var DB = load();
 if (!DB.profile.cycleStart) { DB.profile.cycleStart = E.mondayOf(E.todayStr()); }
 var saveOk = true;
 function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); saveOk = true; } catch (e) { saveOk = false; } }
-var UI = { tab: (location.hash || "#today").slice(1), sub: { plan: "week", journal: "new" }, draft: null, msg: {}, raceDraft: null };
-var ALIAS = { course: ["plan", "course"], proj: ["plan", "proj"] };
+var UI = { tab: (location.hash || "#today").slice(1), sub: { plan: "cal", journal: "new", me: "profile" }, draft: null, msg: {}, raceDraft: null };
+var ALIAS = { course: ["plan", "course"], proj: ["plan", "cal"] };
 if (ALIAS[UI.tab]) { UI.sub.plan = ALIAS[UI.tab][1]; UI.tab = "plan"; }
 function hdr(kicker, title, right) { return '<header class="hdr"><div><p class="muted">' + kicker + "</p><h1>" + title + "</h1></div>" + (right || "") + "</header>"; }
 function seg(group, items, cur, act) { return '<div class="seg" role="group">' + items.map(function (it) { return '<button data-act="' + (act || "seg") + '" data-g="' + group + '" data-v="' + it[0] + '" aria-pressed="' + (cur === it[0]) + '">' + it[1] + "</button>"; }).join("") + "</div>"; }
@@ -473,13 +481,14 @@ function verdictHtml(d) {
 }
 
 function vPlan() {
-  var s = S(), ultra = s.mode === "ultra", sub = UI.sub.plan || "week";
-  if (sub === "levels" && ultra) sub = "week";
-  var items = [["week", ultra ? "Programme" : "Semaine"], ["cal", "Calendrier"], ["proj", "Projection"]];
+  var s = S(), ultra = s.mode === "ultra", sub = UI.sub.plan || "cal";
+  if (sub === "proj") sub = "cal";
+  if (sub === "levels" && ultra) sub = "cal";
+  var items = [["cal", "Calendrier"], ["week", ultra ? "Programme" : "Semaine"]];
   if (!ultra) items.push(["levels", "Paliers"]);
   items.push(["course", "Course"]);
   var h = hdr(ultra ? "Programme ultra-trail · finisher" : "Reprise de charge · périostite", "Plan") + seg("plan", items, sub);
-  return h + { week: vPlanWeek, cal: vCalendar, proj: vProj, levels: vLevels, course: vCourse }[sub]();
+  return h + { week: vPlanWeek, cal: vCalendar, levels: vLevels, course: vCourse }[sub]();
 }
 function vLevels() {
   var s = S(), t = today(), p = DB.profile, h = "";
@@ -561,7 +570,7 @@ function raceAnalysis(r, s, start) {
 }
 
 
-function vProj() {
+function projHead() {
   var s = S(), t = today(), p = DB.profile, h = "";
   var pr = E.projection(p, s, t, p.race, 40);
   var weeks = pr.weeks.filter(function (w) { return w.mode !== "attente"; });
@@ -576,10 +585,17 @@ function vProj() {
     '<p>Début du programme ultra : <strong>' + esc(pr.switchDate ? cap(E.longDate(pr.switchDate)) : "à définir") + "</strong></p>" +
     (p.race ? '<p>Course : <strong>' + esc(p.race.name) + "</strong>, " + esc(E.longDate(p.race.date)) + "</p>" : '<p class="muted">Ajoute une course (Plan › Course) pour voir le programme se projeter.</p>') +
     '<p class="muted">Si toutes les séances restent vertes, au rythme choisi. Chaque séance orange ou rouge décale tout ; la projection se recalcule à chaque saisie.</p></section>';
+  return h;
+}
+function projWeeks() {
+  var s = S(), t = today(), p = DB.profile, h = "";
+  var pr = E.projection(p, s, t, p.race, 40);
+  var weeks = pr.weeks.filter(function (w) { return w.mode !== "attente"; });
+  var maxMin = Math.max.apply(null, weeks.map(function (w) { return w.minutes; }).concat([60]));
   var month = "", body = "";
   weeks.forEach(function (w, i) {
     var mth = E.monthYear(w.monday);
-    if (mth !== month) { if (body) h += body + "</section>"; month = mth; body = '<section class="card"><h2>' + esc(cap(mth)) + "</h2>"; }
+    if (mth !== month) { if (body) h += body + "</div>"; month = mth; body = '<div class="mth"><h2>' + esc(cap(mth)) + "</h2>"; }
     var lab = w.mode === "programme" ? w.block + (w.choc ? " · choc" : "") + (w.light ? " · allégée" : "") : w.mode === "passage" ? "Test de passage" : (w.level ? "Palier " + Math.min(w.level, E.MAX_LEVEL) + " · " + E.LEVELS[Math.min(w.level, E.MAX_LEVEL) - 1].title + (w.consolidation ? " · consolidation" : "") : "Reprise");
     var run = Math.round(w.runMinutes), tot = Math.round(w.minutes);
     body += '<details class="week' + (i === 0 ? " cur" : "") + '"' + (i === 0 ? " open" : "") + '><summary style="display:flex;flex-direction:column;align-items:stretch;gap:6px">' +
@@ -589,13 +605,46 @@ function vProj() {
       '<span class="muted">Course et rando : ' + hm(run) + " · vélo : " + hm(tot - run) + "</span></summary>" +
       weekList(w.sessions, "p" + i + "s") + "</details>";
   });
-  if (body) h += body + "</section>";
-  return h;
+  if (body) h += body + "</div>";
+  return '<section class="card"><details class="more"><summary>Projection semaine par semaine</summary>' + h + "</details></section>";
 }
 
 function vSettings() {
+  var sub = UI.sub.me || "profile";
+  return hdr("Mon espace", "Profil") + seg("me", [["profile", "Mon profil"], ["reglages", "Réglages"]], sub) + (sub === "profile" ? vProfile() : vReglages());
+}
+function vProfile() {
+  var p = DB.profile, s = S(), t = today(), h = "";
+  var nm = (p.name || "").trim(), ini = nm ? nm.charAt(0).toUpperCase() : "N";
+  var lv = E.LEVELS[Math.min(s.level, E.MAX_LEVEL) - 1];
+  var runMin = DB.logs.reduce(function (u, l) { return u + (l.actualMin || (l.activity && l.activity.min) || l.plannedMin || 0); }, 0);
+  var first = DB.logs.length ? DB.logs.map(function (l) { return l.date; }).sort()[0] : null;
+  h += '<section class="card"><div class="row" style="justify-content:flex-start;gap:14px"><span class="avatar" aria-hidden="true">' + esc(ini) + '</span><div><h2>' + esc(nm || "Ton prénom") + '</h2><p class="muted">' + esc(p.goal || "Être finisher") + "</p></div></div>" +
+    '<label class="field">Prénom<input type="text" id="pfName" value="' + esc(p.name) + '" placeholder="Ton prénom" autocomplete="off"></label>' +
+    '<label class="field">Mon objectif<input type="text" id="pfGoal" value="' + esc(p.goal) + '" placeholder="Être finisher"></label>' +
+    '<label class="field">Contexte et consignes (kiné, terrain, contraintes)<textarea id="pfNote" placeholder="Ce qu\'il faut garder en tête pour ta reprise…">' + esc(p.note) + "</textarea></label>" +
+    '<p class="muted">Ces informations restent sur cet appareil.</p></section>';
+  h += '<section class="card"><h2>Ma progression</h2>' +
+    kv("Mode", s.mode === "ultra" ? "Programme ultra-trail" : "Reprise de charge") +
+    (s.mode === "reprise" && lv ? kv("Palier", s.level + " · " + esc(lv.title)) : "") +
+    kv("Rythme", { prudent: "Prudent", dynamique: "Dynamique", limite: "Limite" }[p.rythme || "prudent"]) +
+    kv("Séances vertes d'affilée", String(s.streak || 0)) +
+    kv("Plus longue sortie (30 j)", s.longest ? hm(s.longest) : "—") +
+    kv("Séances enregistrées", String(DB.logs.length)) +
+    kv("Temps de course cumulé", runMin ? hm(runMin) : "—") +
+    (first ? kv("Premier suivi", esc(E.longDate(first))) : "") + "</section>";
+  var rc = p.race;
+  h += '<section class="card"><div class="row"><h2>Ma course</h2><button class="small" data-act="tab" data-tab="course">' + (rc ? "Modifier" : "Ajouter") + "</button></div>" +
+    (rc ? kv("Course", esc(rc.name)) + kv("Date", esc(E.longDate(rc.date)) + " · J-" + Math.max(0, E.diffDays(t, rc.date))) : '<p class="muted">Aucune course enregistrée. Ajoute-la pour voir le programme se projeter jusqu\'au jour J.</p>') + "</section>";
+  var zs = zones();
+  h += '<section class="card"><div class="row"><h2>Ma montre</h2><button class="small" data-act="settings">Réglages</button></div>' +
+    kv("Intervals.icu", ivReady() ? "Relié" : "À relier") +
+    kv("Endurance (Z1)", zs[0][0] + "–" + zs[0][1] + " bpm") +
+    kv("Zones de FC", p.hrTrusted ? "Confirmées" : "Indicatives") + "</section>";
+  return h;
+}
+function vReglages() {
   var p = DB.profile, h = "";
-  h += hdr("NaqRun", "Réglages");
   h += '<section class="card"><h2>Montre · Intervals.icu</h2><p class="muted">Dans Intervals.icu : Settings › Connections › Garmin Connect, coche « Upload planned workouts ». Identifiant et clé API dans Settings › Developer Settings. Ils restent sur ce téléphone.</p>' +
     '<label class="field">Identifiant d\'athlète<input type="text" id="ivId" value="' + esc(p.intervalsId) + '" placeholder="i123456" autocapitalize="off" autocomplete="off"></label>' +
     '<label class="field">Clé API<input type="password" id="ivKey" value="' + esc(p.intervalsKey) + '" autocomplete="off"></label>' +
@@ -751,7 +800,7 @@ function vCalendar() {
   var t = today(), ym = UI.calMonth || t.slice(0, 7), map = calMap();
   var y = +ym.slice(0, 4), m = +ym.slice(5, 7), first = ym + "-01", start = E.mondayOf(first);
   var months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-  var h = '<section class="card"><div class="row"><button class="small" data-act="calnav" data-d="-1" aria-label="Mois précédent">‹</button><h2 style="text-align:center">' + cap(months[m - 1]) + " " + y + '</h2><button class="small" data-act="calnav" data-d="1" aria-label="Mois suivant">›</button></div>';
+  var h = '<div class="calwrap"><div class="calmain"><section class="card"><div class="row"><button class="small" data-act="calnav" data-d="-1" aria-label="Mois précédent">‹</button><h2 class="calTitle">' + cap(months[m - 1]) + " " + y + '</h2><button class="small" data-act="calnav" data-d="1" aria-label="Mois suivant">›</button></div>' + (ym !== t.slice(0, 7) ? '<button class="small" data-act="caltoday">Revenir à aujourd\'hui</button>' : "");
   h += '<div class="cal cal-h">' + ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"].map(function (d) { return "<span>" + d + "</span>"; }).join("") + "</div><div class=\"cal\">";
   var sel = UI.calSel || t;
   for (var i = 0; i < 42; i++) {
@@ -762,14 +811,14 @@ function vCalendar() {
     var tt = list.filter(function (x) { return !x.past; }).slice(0, 2).map(function (x) { return '<span class="ct">' + esc(x.title.replace(/ · .*/, "")) + "</span>"; }).join("");
     h += '<button class="day' + (isRest ? " rest" : "") + (out ? " out" : "") + (d === t ? " today" : "") + (d === sel ? " sel" : "") + '" data-act="calday" data-d="' + d + '" aria-label="' + esc(E.longDate(d)) + '"><b>' + +d.slice(8) + '</b><span class="dots">' + dots + "</span>" + tt + "</button>";
   }
-  h += "</div>" + legend([["Course", "var(--accent)"], ["Rando / sortie longue", "var(--s3)"], ["Vélo", "var(--s1)"], ["Repos", "var(--g)"]]) + '<p class="muted">Un point plein = séance faite. Les séances à venir suivent ton palier actuel et se recalculent à chaque saisie.</p></section>';
+  h += "</div>" + legend([["Course", "var(--accent)"], ["Rando / sortie longue", "var(--s3)"], ["Vélo", "var(--s1)"], ["Repos", "var(--g)"]]) + '<p class="muted">Un point plein = séance faite. Les séances à venir suivent ton palier actuel et se recalculent à chaque saisie.</p></section></div><aside class="calside">';
   var dl = (map[sel] || []);
   var plan = dl.filter(function (x) { return !x.past; }), past = dl.filter(function (x) { return x.past; });
   h += '<section class="card"><h2>' + esc(cap(E.longDate(sel))) + "</h2>";
   if (plan.length) h += weekList(plan, "cal");
   past.forEach(function (x) { h += '<div class="kv"><span>' + esc(x.title) + " (journal)</span>" + chip(x.v, x.prov) + "</div>"; });
   if (!dl.length) h += '<p class="muted">Rien de prévu ce jour-là : repos.</p>';
-  return h + "</section>";
+  return h + "</section>" + projHead() + "</aside></div>" + projWeeks();
 }
 
 // ---------- Rendu et événements ----------
@@ -779,10 +828,11 @@ function render() {
   if (UI.tab === "data") loadData();
   var v = { today: vToday, journal: vJournal, plan: vPlan, data: vData, settings: vSettings }[UI.tab] || vToday;
   if (UI.tab === "today" && UI.finish && UI.draft) v = vFinish;
-  document.getElementById("app").innerHTML = v();
+  var app = document.getElementById("app"); app.dataset.view = UI.tab + (v === vFinish ? "-finish" : "");
+  app.innerHTML = v();
   document.querySelectorAll("nav.tabs button").forEach(function (b) { if (b.dataset.tab === UI.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
 }
-function go(tab) { UI.flash = null; UI.cant = null; if (tab !== "today") UI.finish = false; if (ALIAS[tab]) { UI.sub.plan = ALIAS[tab][1]; tab = "plan"; } UI.tab = tab; try { history.replaceState(null, "", "#" + tab); } catch (e) {} render(); window.scrollTo(0, 0); }
+function go(tab) { if (tab === "settings" && UI.tab !== "settings") UI.sub.me = "profile"; UI.flash = null; UI.cant = null; if (tab !== "today") UI.finish = false; if (ALIAS[tab]) { UI.sub.plan = ALIAS[tab][1]; tab = "plan"; } UI.tab = tab; try { history.replaceState(null, "", "#" + tab); } catch (e) {} render(); window.scrollTo(0, 0); }
 function readDraft() {
   var d = UI.draft; if (!d) return;
   var el = function (id) { return document.getElementById(id); };
@@ -833,8 +883,9 @@ document.addEventListener("click", function (ev) {
   if (b.closest("nav.tabs")) { go(b.dataset.tab); return; }
   var a = b.dataset.act, t = today(), p = DB.profile;
   if (a === "tab") return go(b.dataset.tab);
-  if (a === "settings") return go("settings");
+  if (a === "settings") { UI.sub.me = "reglages"; return go("settings"); }
   if (a === "calnav") { var cm = UI.calMonth || t.slice(0, 7), cd = new Date(Date.UTC(+cm.slice(0, 4), +cm.slice(5, 7) - 1 + (+b.dataset.d), 1)); UI.calMonth = cd.toISOString().slice(0, 7); return render(); }
+  if (a === "caltoday") { UI.calMonth = t.slice(0, 7); UI.calSel = t; return render(); }
   if (a === "calday") { UI.calSel = b.dataset.d; UI.calMonth = b.dataset.d.slice(0, 7); return render(); }
   if (a === "seg") { if (b.dataset.g === "finish") readDraft(); UI.sub[b.dataset.g] = b.dataset.v; render(); return window.scrollTo(0, 0); }
   if (a === "welcome") { p._welcomed = true; save(); return render(); }
@@ -951,6 +1002,7 @@ document.addEventListener("change", function (ev) {
   if (t.dataset.gate) { p.gates[t.dataset.gate] = t.checked; save(); return render(); }
   if (t.dataset.race) { readRace(); var s2 = S(), box = document.getElementById("raceAnalysis"); if (box) box.innerHTML = raceAnalysis(UI.raceDraft, s2, E.prepStart(DB.profile, s2, today())); return; }
   if (t.dataset.zone) { var k2 = t.dataset.zone.split(".").map(Number); p.zones = zones().map(function (z) { return z.slice(); }); if (+t.value > 60 && +t.value < 230) { p.zones[k2[0]][k2[1]] = +t.value; save(); } return; }
+  if (t.id === "pfName" || t.id === "pfGoal" || t.id === "pfNote") { p[{ pfName: "name", pfGoal: "goal", pfNote: "note" }[t.id]] = t.value; save(); return; }
   if (t.id === "hrTrusted") { p.hrTrusted = t.checked; save(); return render(); }
   if (t.id === "startLevel") { p.startLevel = +t.value; save(); return; }
   if (t.id === "hoursMax") { p.hoursMax = Math.max(5, Math.min(16, +t.value || 10)); save(); return; }
