@@ -146,6 +146,7 @@ select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:
   nav.tabs button{font-size:11px;padding:6px 2px 0;min-width:0}
   nav.tabs button svg{padding:3px 8px}
 }
+.scols{display:flex;flex-direction:column;gap:14px}.sc{display:flex;flex-direction:column;gap:14px;min-width:0}
 .calwrap{display:flex;flex-direction:column;gap:14px}.calmain,.calside{display:flex;flex-direction:column;gap:14px;min-width:0}
 /* Ordinateur : menu à gauche, toute la largeur, calendrier au centre */
 @media (min-width:900px){
@@ -153,6 +154,8 @@ select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:
   main{max-width:none;padding:32px 40px 48px;display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));align-items:start;gap:16px}
   main>.hdr,main>.seg,main>.notice,main>.calwrap,main>.full,main>details,main>.card.full{grid-column:1/-1}
   main>.seg{max-width:560px}
+  main[data-view=today]{grid-template-columns:minmax(0,1fr)}
+  .scols{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:28px;align-items:start}
   main[data-view$=finish]{grid-template-columns:minmax(0,760px);justify-content:center}
   .calwrap{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
   .calTitle{font-size:26px}
@@ -335,13 +338,13 @@ function sessionCard(sess, key, label) {
   SESSIONS[key] = sess;
   var min = E.totalMin(sess.blocks);
   var sub = hm(min) + " au total" + (sess.level ? " · palier " + sess.level + " sur " + E.MAX_LEVEL + " · " + sess.phase : (sess.week ? " · " + sess.week.block + ", semaine " + sess.week.i : ""));
-  return '<section class="card"><div class="row"><h2>' + esc(label) + '</h2><span class="chip soft">' + esc(KINDS[sess.kind] || sess.kind) + "</span></div>" +
+  return '<section class="card"><div class="row"><h2>' + esc(label) + '</h2><span class="chip soft">' + esc(KINDS[sess.kind] || sess.kind) + '</span></div><div class="scols"><div class="sc">' +
     '<div><p class="ttl">' + esc(sess.title) + '</p><p class="muted">' + esc(sub) + "</p></div>" +
     (sess.adjustments ? sess.adjustments.map(function (a) { return '<div class="notice err">' + esc(a) + "</div>"; }).join("") : "") +
-    stepsHtml(sess.blocks) + (sess.note ? '<div class="notice">' + esc(sess.note) + "</div>" : "") +
+    stepsHtml(sess.blocks) + (sess.note ? '<div class="notice">' + esc(sess.note) + "</div>" : "") + '</div><div class="sc">' +
     '<button class="primary" data-act="send" data-key="' + key + '">' + WATCH + "Envoyer sur la Fenix 7X</button>" + msgHtml(key) +
     (sess.kind !== "velo" ? '<button data-act="finish" data-key="' + key + '">J\'ai terminé la séance</button>' : "") + moveHtml(sess, key) +
-    (sess.kind !== "velo" ? '<details class="more"><summary>Si ça fait mal pendant la course</summary><p class="muted" style="margin-top:6px">Au-delà de 3/10, ralentis ou marche. Au-delà de 5/10, ou si la douleur augmente, arrête et rentre en marchant.</p></details>' : "") + "</section>";
+    (sess.kind !== "velo" ? '<details class="more"><summary>Si ça fait mal pendant la course</summary><p class="muted" style="margin-top:6px">Au-delà de 3/10, ralentis ou marche. Au-delà de 5/10, ou si la douleur augmente, arrête et rentre en marchant.</p></details>' : "") + "</div></div></section>";
 }
 function weekList(sessions, prefix, nodate) {
   if (!sessions.length) return '<p class="muted">Aucune séance prévue.</p>';
