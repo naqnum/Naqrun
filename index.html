@@ -174,9 +174,8 @@ select{-webkit-appearance:none;appearance:none;min-height:44px;background-image:
 <nav class="tabs" aria-label="Navigation principale"><div class="in">
   <button data-tab="today"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><span>Aujourd'hui</span></button>
   <button data-tab="plan"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M4 11h16"></path><path d="M8 15h2M14 15h2"></path></svg><span>Plan</span></button>
-  <button data-tab="journal"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h11"></path><path d="M9 8h6"></path></svg><span>Journal</span></button>
-  <button data-tab="data"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11M12 20V4M19 20v-6"></path></svg><span>Données</span></button>
-  <button data-tab="settings"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg><span>Profil</span></button>
+  <button data-tab="journal"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h11"></path><path d="M9 8h6"></path></svg><span>Bilan</span></button>
+    <button data-tab="settings"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg><span>Profil</span></button>
 </div></nav>
 <script src="engine.js"></script>
 <script>
@@ -205,8 +204,8 @@ if (!DB.profile.cycleStart) { DB.profile.cycleStart = E.mondayOf(E.todayStr()); 
 var saveOk = true;
 function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); saveOk = true; } catch (e) { saveOk = false; } }
 var UI = { tab: (location.hash || "#today").slice(1), sub: { plan: "cal", journal: "new", me: "profile", jr: "suivi" }, draft: null, msg: {}, raceDraft: null };
-var ALIAS = { course: ["plan", "course"], proj: ["plan", "cal"] };
-if (ALIAS[UI.tab]) { UI.sub.plan = ALIAS[UI.tab][1]; UI.tab = "plan"; }
+var ALIAS = { course: ["plan", "course"], proj: ["plan", "cal"], data: ["journal", "data"] };
+if (ALIAS[UI.tab]) { UI.sub[ALIAS[UI.tab][0] === "plan" ? "plan" : "jr"] = ALIAS[UI.tab][1]; UI.tab = ALIAS[UI.tab][0]; }
 function hdr(kicker, title, right) { return '<header class="hdr"><div><p class="muted">' + kicker + "</p><h1>" + title + "</h1></div>" + (right || "") + "</header>"; }
 function seg(group, items, cur, act) { return '<div class="seg" role="group">' + items.map(function (it) { return '<button data-act="' + (act || "seg") + '" data-g="' + group + '" data-v="' + it[0] + '" aria-pressed="' + (cur === it[0]) + '">' + it[1] + "</button>"; }).join("") + "</div>"; }
 var PSTOPS = [[0, [63, 191, 111]], [4, [201, 217, 74]], [6, [255, 194, 71]], [8, [255, 122, 26]], [10, [229, 72, 61]]];
@@ -445,7 +444,8 @@ function doneCard(x, key) {
 }
 
 function vJournal() {
-  var s = S(), sub = UI.sub.jr || "suivi", h = hdr("Suivi et historique", "Journal") + seg("jr", [["suivi", "Mon suivi"], ["hist", "Historique"]], sub), logs = s.logs.slice().reverse();
+  var s = S(), sub = UI.sub.jr || "suivi", h = hdr("Suivi, données et historique", "Bilan") + seg("jr", [["suivi", "Mon suivi"], ["data", "Données"], ["hist", "Historique"]], sub), logs = s.logs.slice().reverse();
+  if (sub === "data") return h + vData();
   if (sub === "suivi") return h + vSuivi(s, today(), DB.profile, E.readiness(WELL.list, today()));
   return h + '<section class="card">' + (logs.length ? logs.map(function (l) {
     return '<div class="log"><div class="row"><strong style="font-size:14px">' + esc(cap(E.longDate(l.date))) + "</strong>" + chip(l._v, l._provisional) + '</div><span class="muted">' + esc(l.title && l.title.indexOf(KINDS[l.kind] || "§") === 0 ? l.title : (KINDS[l.kind] || "Course") + (l.title ? " · " + l.title : "")) + " · pendant " + l.during + "/10 · après " + l.after + "/10 · matin " + (l.morning == null ? "—" : l.morning + "/10") + (l.activity ? " · " + esc(l.activity.km) + " km" : "") + "</span>" +
@@ -741,7 +741,7 @@ function chartCard(title, sub, body, table) {
 function tbl(head, rows) { return '<table class="tbl"><thead><tr>' + head.map(function (x) { return "<th>" + esc(x) + "</th>"; }).join("") + "</tr></thead><tbody>" + rows.map(function (r) { return "<tr>" + r.map(function (x) { return "<td>" + esc(x) + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table>"; }
 
 function vData() {
-  var s = S(), t = today(), h = hdr("Ce que disent tes sorties", "Données");
+  var s = S(), t = today(), h = "";
   var runs = dataRuns(), monday = E.mondayOf(t);
   if (!ivReady() && !DB.logs.length) return h + '<section class="card"><h2>Pas encore de données</h2><p class="muted">Relie Intervals.icu dans les réglages pour récupérer tes sorties depuis ta montre, ou enregistre tes séances dans le journal.</p><button class="small" data-act="settings">Réglages</button></section>';
   if (ivReady() && !DATA.list && !DATA.err) h += '<p class="muted">Chargement de tes sorties…</p>';
@@ -838,14 +838,14 @@ function vCalendar() {
 function render() {
   SESSIONS = {}; if (typeof hideTip === "function") hideTip();
   if (UI.tab === "today" || UI.tab === "plan" || UI.tab === "journal") loadActs(false);
-  if (UI.tab === "data") loadData();
-  var v = { today: vToday, journal: vJournal, plan: vPlan, data: vData, settings: vSettings }[UI.tab] || vToday;
+  if (UI.tab === "journal" && UI.sub.jr === "data") loadData();
+  var v = { today: vToday, journal: vJournal, plan: vPlan, settings: vSettings }[UI.tab] || vToday;
   if (UI.tab === "today" && UI.finish && UI.draft) v = vFinish;
   var app = document.getElementById("app"); app.dataset.view = UI.tab + (v === vFinish ? "-finish" : "");
   app.innerHTML = v();
   document.querySelectorAll("nav.tabs button").forEach(function (b) { if (b.dataset.tab === UI.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
 }
-function go(tab) { if (tab === "journal" && UI.tab !== "journal") UI.sub.jr = "suivi"; if (tab === "settings" && UI.tab !== "settings") UI.sub.me = "profile"; UI.flash = null; UI.cant = null; if (tab !== "today") UI.finish = false; if (ALIAS[tab]) { UI.sub.plan = ALIAS[tab][1]; tab = "plan"; } UI.tab = tab; try { history.replaceState(null, "", "#" + tab); } catch (e) {} render(); window.scrollTo(0, 0); }
+function go(tab) { if (tab === "journal" && UI.tab !== "journal") UI.sub.jr = "suivi"; if (tab === "settings" && UI.tab !== "settings") UI.sub.me = "profile"; UI.flash = null; UI.cant = null; if (tab !== "today") UI.finish = false; if (ALIAS[tab]) { UI.sub[ALIAS[tab][0] === "plan" ? "plan" : "jr"] = ALIAS[tab][1]; tab = ALIAS[tab][0]; } UI.tab = tab; try { history.replaceState(null, "", "#" + tab); } catch (e) {} render(); window.scrollTo(0, 0); }
 function readDraft() {
   var d = UI.draft; if (!d) return;
   var el = function (id) { return document.getElementById(id); };
