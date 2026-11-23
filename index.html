@@ -204,7 +204,7 @@ var DB = load();
 if (!DB.profile.cycleStart) { DB.profile.cycleStart = E.mondayOf(E.todayStr()); }
 var saveOk = true;
 function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); saveOk = true; } catch (e) { saveOk = false; } }
-var UI = { tab: (location.hash || "#today").slice(1), sub: { plan: "cal", journal: "new", me: "profile" }, draft: null, msg: {}, raceDraft: null };
+var UI = { tab: (location.hash || "#today").slice(1), sub: { plan: "cal", journal: "new", me: "profile", today: "seance" }, draft: null, msg: {}, raceDraft: null };
 var ALIAS = { course: ["plan", "course"], proj: ["plan", "cal"] };
 if (ALIAS[UI.tab]) { UI.sub.plan = ALIAS[UI.tab][1]; UI.tab = "plan"; }
 function hdr(kicker, title, right) { return '<header class="hdr"><div><p class="muted">' + kicker + "</p><h1>" + title + "</h1></div>" + (right || "") + "</header>"; }
@@ -379,11 +379,14 @@ function moveHtml(x, key) {
 function vToday() {
   var s = S(), t = today(), p = DB.profile, h = "";
   h += hdr(esc(cap(E.longDate(t))), "Aujourd'hui", '<span class="chip soft">' + (s.mode === "ultra" ? "Programme" : "Reprise") + "</span>");
+  var sub = UI.sub.today || "seance";
+  h += seg("today", [["seance", "Ma séance"], ["suivi", "Mon suivi"]], sub);
   if (!saveOk) h += '<div class="notice err">Le stockage du téléphone est indisponible : tes saisies ne seront pas gardées.</div>';
   h += flashHtml();
   if (!DB.logs.length && !p._welcomed) h += '<section class="card"><h2>Bienvenue sur NaqRun</h2><p class="muted">Tu démarres au palier ' + p.startLevel + " (" + esc(E.LEVELS[p.startLevel - 1].title) + '). Relie Intervals.icu dans les réglages pour envoyer les séances sur ta Fenix.</p><div class="btns"><button class="small" data-act="settings">Réglages</button><button class="small" data-act="welcome">Compris</button></div></section>';
   if (s.stopped) h += '<section class="card" style="border-color:var(--r)"><div class="row"><h2>Arrêt</h2>' + chip("stop") + '</div><p>Tu as signalé un signe d\'arrêt (douleur précise sur l\'os, douleur au repos ou boiterie). Arrête la course et demande un avis médical : ce sont des signes possibles de fracture de fatigue.</p><button data-act="clearstop">J\'ai eu le feu vert médical</button></section>';
   var rd = E.readiness(WELL.list, t);
+  if (sub === "suivi") return h + vSuivi(s, t, p, rd);
   var pending = s.logs.filter(function (l) { return l.morning == null && l.date < t; }).pop();
   if (pending) h += '<section class="card"><div class="row"><h2>Note du matin</h2><span class="muted">séance du ' + esc(E.longDate(pending.date)) + '</span></div><label class="field"><span class="row">Douleur au tibia au réveil ' + painVal("mv", 0, "pain") + '</span><input type="range" class="pain" min="0" max="10" value="0" id="morningQuick" style="--c:' + painColor(0) + '"></label><button class="primary" data-act="morning" data-id="' + pending.id + '">Valider la note</button></section>';
   var race = p.race;
@@ -404,19 +407,31 @@ function vToday() {
       h += '<section class="card"><h2>' + (ranNow ? "Prochaine séance" : "Repos aujourd\'hui") + '</h2><p class="muted">' + (s.resting ? "Repos en cours : vélo possible, pas de course." : ranNow ? "" : "Pas de séance prévue.") + "</p>" + (next ? '<p>Prochaine séance : <strong>' + esc(next.title) + "</strong>, " + esc(E.longDate(next.date)) + ".</p>" : "") + "</section>";
     }
   }
-  // Suivi : une seule carte pour la dernière séance, la forme du jour et l'objectif
-  var rows = "", lastLog = s.lastVerdict ? s.logs[s.logs.length - 1] : null;
-  if (lastLog) rows += kv("Dernière séance", chip(lastLog._v, lastLog._provisional));
-  if (rd.status !== "inconnu") rows += kv("Forme du matin", '<span class="chip ' + (rd.status === "ok" ? "vert" : "orange") + '"><span class="dot"></span>' + (rd.status === "ok" ? "Normale" : "Basse") + "</span>");
-  if (race) { var days = E.diffDays(t, race.date); rows += kv(esc(race.name || "Course objectif"), days >= 0 ? "J-" + days : "passée"); }
-  if (s.mode === "reprise") rows += kv("Fin de reprise estimée", esc(E.monthYear(E.estimateOptimal(p, s, t))));
-  if (rd.status === "bas") rows += '<p class="muted">' + esc(cap(rd.reasons.join(" ; "))) + " : la course du jour est allégée.</p>";
-  if (rows) {
-    var txt = s.mode === "ultra" ? "" : s.done ? "Paliers terminés : passe le test de passage (Plan › Paliers)." : s.streak + " footing progression vert sur 2 pour passer au palier " + Math.min(s.level + 1, 15) + ".";
-    h += '<section class="card"><h2>Suivi</h2>' + rows + (s.mode === "reprise" ? (txt ? '<p class="muted">' + esc(txt) + "</p>" : "") + '<div class="bar" aria-hidden="true"><div style="width:' + Math.round(Math.min(s.level - 1, E.MAX_LEVEL) / E.MAX_LEVEL * 100) + '%"></div></div><div class="row"><span class="muted">Reprise</span><span class="muted">Palier ' + Math.min(s.level, 15) + " / 15</span></div>" : "") +
-      (!race && s.mode === "reprise" ? '<button class="small" data-act="tab" data-tab="course">Renseigner une course objectif</button>' : "") + "</section>";
-  }
   h += '<button class="small" data-act="finish" data-key="">Noter une sortie hors plan</button>';
+  return h;
+}
+function vSuivi(s, t, p, rd) {
+  var h = "", race = p.race, last = s.logs[s.logs.length - 1] || null, lv = E.LEVELS[Math.min(s.level, E.MAX_LEVEL) - 1];
+  // 1. Où j'en suis
+  h += '<section class="card"><h2>Où j\'en suis</h2>';
+  if (s.mode === "reprise") {
+    h += kv("Palier", Math.min(s.level, E.MAX_LEVEL) + " sur " + E.MAX_LEVEL + (lv ? " · " + esc(lv.title) : "")) +
+      '<div class="bar" aria-hidden="true"><div style="width:' + Math.round(Math.min(s.level - 1, E.MAX_LEVEL) / E.MAX_LEVEL * 100) + '%"></div></div>' +
+      '<p class="muted">' + esc(s.done ? "Paliers terminés : passe le test de passage (Plan › Paliers)." : s.streak + " footing progression vert sur 2 pour passer au palier " + Math.min(s.level + 1, E.MAX_LEVEL) + ".") + "</p>" +
+      kv("Fin de reprise estimée", esc(E.monthYear(E.estimateOptimal(p, s, t))));
+  } else h += kv("Étape", "Programme ultra-trail") + (s.ultraStart ? kv("Depuis le", esc(E.longDate(s.ultraStart))) : "");
+  h += "</section>";
+  // 2. Comment je vais
+  var rows = "";
+  if (last) rows += kv("Dernière séance", chip(last._v, last._provisional));
+  if (rd.status !== "inconnu") rows += kv("Forme du matin", '<span class="chip ' + (rd.status === "ok" ? "vert" : "orange") + '"><span class="dot"></span>' + (rd.status === "ok" ? "Normale" : "Basse") + "</span>");
+  if (rd.status === "bas") rows += '<p class="muted">' + esc(cap(rd.reasons.join(" ; "))) + " : la course du jour est allégée.</p>";
+  h += '<section class="card"><h2>Comment je vais</h2>' + (rows || '<p class="muted">Pas encore de séance ni de mesure de forme. Ça se remplit après ta première séance.</p>') + "</section>";
+  // 3. Objectif
+  h += '<section class="card"><h2>Mon objectif</h2>' + (race ? kv(esc(race.name || "Course objectif"), (function () { var d = E.diffDays(t, race.date); return d >= 0 ? "J-" + d : "passée"; })()) + kv("Date", esc(E.longDate(race.date))) : '<p class="muted">Aucune course enregistrée.</p><button class="small" data-act="tab" data-tab="course">Renseigner une course objectif</button>') + "</section>";
+  // 4. Dernières séances
+  var recent = s.logs.slice(-4).reverse();
+  if (recent.length) h += '<section class="card"><h2>Dernières séances</h2>' + recent.map(function (l) { return '<div class="kv"><span>' + esc(cap(E.longDate(l.date))) + '<br><span class="muted">' + esc(l.title || KINDS[l.kind] || "Course") + "</span></span>" + chip(l._v, l._provisional) + "</div>"; }).join("") + '<button class="small" data-act="tab" data-tab="journal">Tout l\'historique</button></section>';
   return h;
 }
 function doneCard(x, key) {
@@ -832,7 +847,7 @@ function render() {
   app.innerHTML = v();
   document.querySelectorAll("nav.tabs button").forEach(function (b) { if (b.dataset.tab === UI.tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
 }
-function go(tab) { if (tab === "settings" && UI.tab !== "settings") UI.sub.me = "profile"; UI.flash = null; UI.cant = null; if (tab !== "today") UI.finish = false; if (ALIAS[tab]) { UI.sub.plan = ALIAS[tab][1]; tab = "plan"; } UI.tab = tab; try { history.replaceState(null, "", "#" + tab); } catch (e) {} render(); window.scrollTo(0, 0); }
+function go(tab) { if (tab === "today" && UI.tab !== "today") UI.sub.today = "seance"; if (tab === "settings" && UI.tab !== "settings") UI.sub.me = "profile"; UI.flash = null; UI.cant = null; if (tab !== "today") UI.finish = false; if (ALIAS[tab]) { UI.sub.plan = ALIAS[tab][1]; tab = "plan"; } UI.tab = tab; try { history.replaceState(null, "", "#" + tab); } catch (e) {} render(); window.scrollTo(0, 0); }
 function readDraft() {
   var d = UI.draft; if (!d) return;
   var el = function (id) { return document.getElementById(id); };
